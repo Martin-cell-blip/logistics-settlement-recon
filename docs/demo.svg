@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="486" font-family="'SF Mono','Cascadia Code',Consolas,Menlo,'Microsoft YaHei',monospace" font-size="13">
+  <defs>
+    <style>
+      .cmd{fill:#e6edf3} .prompt{fill:#3fb950;font-weight:bold} .dim{fill:#8b949e}
+      .cyan{fill:#39c5cf} .white{fill:#e6edf3} .warn{fill:#e3b341} .green{fill:#3fb950}
+      .gb{fill:#3fb950;font-weight:bold}
+    </style>
+  </defs>
+  <!-- window -->
+  <rect x="0" y="0" width="820" height="486" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <rect x="0" y="0" width="820" height="34" rx="10" fill="#161b22"/>
+  <rect x="0" y="24" width="820" height="10" fill="#161b22"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="40" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="60" cy="17" r="6" fill="#27c93f"/>
+  <text x="410" y="21" text-anchor="middle" class="dim" font-size="12">logistics-settlement-recon — 结算对账流水线</text>
+
+  <!-- body -->
+  <g>
+    <text x="18" y="60"><tspan class="prompt">$ </tspan><tspan class="cmd">python src/run_pipeline.py</tspan></text>
+    <text x="18" y="82" class="dim">[2/3] 执行 SQL：三方对账 + 应收账龄 …</text>
+    <text x="18" y="100" class="dim">[3/3] 导出报表到 output/ …</text>
+
+    <text x="18" y="128" class="cyan">=== 三方对账汇总 recon_summary ===</text>
+    <text y="148"><tspan x="18" class="dim">recon_status</tspan><tspan x="250" class="dim">n_records</tspan><tspan x="400" class="dim">variance</tspan></text>
+    <text y="168"><tspan x="18" class="white">MATCH</tspan><tspan x="250" class="white">86,050</tspan><tspan x="400" class="dim">−2.76</tspan></text>
+    <text y="186"><tspan x="18" class="warn">OVERBILLED</tspan><tspan x="250" class="white">3,493</tspan><tspan x="400" class="warn">+21,536</tspan></text>
+    <text y="204"><tspan x="18" class="warn">DUPLICATE</tspan><tspan x="250" class="white">2,989</tspan><tspan x="400" class="warn">+68,873</tspan></text>
+    <text y="222"><tspan x="18" class="warn">NOT_BILLED</tspan><tspan x="250" class="white">2,922</tspan><tspan x="400" class="warn">−65,281</tspan></text>
+    <text y="240"><tspan x="18" class="warn">MISSING_ORDER</tspan><tspan x="250" class="white">1,200</tspan><tspan x="400" class="warn">+38,659</tspan></text>
+    <text y="258"><tspan x="18" class="warn">NOT_DELIVERED</tspan><tspan x="250" class="white">407</tspan></text>
+
+    <text x="18" y="286" class="cyan">=== 对账引擎准确率验证（vs 注入 ground-truth）===</text>
+    <text x="18" y="306" class="green">重复 / 幽灵单 / 未送达 / 漏计 …… 查全率 100%</text>
+    <text y="324"><tspan x="18" class="gb">异常总体查全率 ……………………… 99.9%</tspan></text>
+
+    <text x="18" y="356"><tspan class="prompt">$ </tspan><tspan class="cmd">python src/audit_agent.py --top 25</tspan></text>
+    <text x="18" y="378" class="dim">[完成] 复核 13,368 条异常 → exception_review.csv / .md</text>
+    <text y="398"><tspan x="18" class="white">可拒付 / 追回金额合计 ≈ </tspan><tspan class="gb">¥139,511</tspan></text>
+
+    <text x="18" y="428" class="cyan">=== 应收账龄 · DSO · 坏账 ===</text>
+    <text y="448"><tspan x="18" class="white">DSO </tspan><tspan class="gb">53.7 天</tspan><tspan class="white"> · 加权坏账率 </tspan><tspan class="gb">2.66%</tspan><tspan class="white"> · 90+ 占比 </tspan><tspan class="gb">0.97%</tspan></text>
+    <text x="18" y="468"><tspan class="prompt">$ </tspan><tspan class="cmd">▍</tspan></text>
+  </g>
+</svg>

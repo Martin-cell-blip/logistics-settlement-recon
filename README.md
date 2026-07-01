@@ -7,6 +7,10 @@
 ③**坏账(ECL)计提**（账龄率矩阵）
 并用注入的 ground-truth 验证对账引擎**异常识别查全率 ≈ 99.9%**。
 
+![一条命令跑出对账异常与验证](docs/demo.svg)
+
+> 📊 **可视化报告**：[docs/settlement_dashboard.html](docs/settlement_dashboard.html)（KPI 卡片 + 对账分布 + 账龄柱状 + Top 异常，可打印 PDF）
+
 > 面向岗位：京东物流「财务结算运营（Bill Reconciliation & Settlement）」实习。项目职责一一对应对账、异常处理、应收账龄、坏账监控、结算自动化、数据分析报表。
 
 ---
