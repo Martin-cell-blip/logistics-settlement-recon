@@ -1,0 +1,18 @@
+# 数据与产物不入库（可由脚本一键重建：fetch_olist → generate_data → run_pipeline）
+data/raw/*.csv
+data/generated/*.csv
+output/*.csv
+output/*.xlsx
+output/*.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.duckdb
+
+# 保留空目录
+!data/raw/.gitkeep
+!data/generated/.gitkeep
+!output/.gitkeep
