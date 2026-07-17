@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settlement Review Copilot</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700;900&display=swap');
+    :root { --ink:#14211f; --muted:#65716e; --paper:#f5f1e7; --line:#c9c3b5; --panel:#fffcf4; --teal:#0e6157; --mint:#c8e0d7; --orange:#dc6334; --red:#a62c22; --gold:#e6b84a; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:14px/1.55 "IBM Plex Mono", "Noto Sans Mono CJK SC", monospace; }
+    .topbar { min-height:116px; display:flex; justify-content:space-between; align-items:flex-end; gap:22px; padding:27px 4.5vw 23px; color:#f7f2e6; background:var(--ink); border-bottom:6px solid var(--gold); }
+    .eyebrow { margin:0 0 5px; color:#a6d3c8; font-size:11px; letter-spacing:.14em; text-transform:uppercase; }
+    h1 { margin:0; font:900 clamp(28px,4vw,50px)/.98 "Noto Serif SC", serif; letter-spacing:-.06em; }
+    .mode { max-width:395px; padding:9px 11px; border:1px solid #55736c; color:#d7e7dd; font-size:12px; }
+    main { display:grid; grid-template-columns:minmax(280px, .83fr) minmax(500px, 1.7fr); min-height:calc(100vh - 122px); }
+    aside { border-right:1px solid var(--line); padding:26px 20px; background:#ece7d9; }
+    .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:12px; margin-bottom:18px; }
+    .filters { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px; }
+    button { font:inherit; cursor:pointer; }
+    .filter { padding:6px 9px; border:1px solid var(--line); background:transparent; color:var(--muted); }
+    .filter.active { color:#fff; background:var(--teal); border-color:var(--teal); }
+    .case { width:100%; text-align:left; padding:15px 12px; border:1px solid var(--line); border-bottom:none; background:var(--panel); transition:.18s ease; }
+    .case:last-child { border-bottom:1px solid var(--line); }
+    .case:hover,.case.active { background:#fff8db; border-color:#879c93; box-shadow:inset 0 0 0 1px #879c93; }
+    .case-head,.case-foot { display:flex; justify-content:space-between; gap:8px; }
+    .case-head { font-weight:600; } .case-foot { margin-top:8px; color:var(--muted); font-size:12px; }
+    .pill { display:inline-block; padding:2px 6px; color:#fff; background:var(--orange); font-size:11px; line-height:1.3; }
+    .pill.p2 { background:var(--teal); } .pill.p3 { background:#7b847e; }
+    article { padding:30px clamp(22px,4vw,68px) 54px; max-width:1100px; }
+    .case-title { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; border-bottom:1px solid var(--ink); padding-bottom:20px; }
+    h2 { margin:5px 0 0; font:700 clamp(23px,3vw,36px)/1.05 "Noto Serif SC", serif; letter-spacing:-.05em; }
+    .money { color:var(--red); font-size:24px; font-weight:600; white-space:nowrap; }
+    .tagline { color:var(--muted); margin:14px 0 22px; }
+    .grid { display:grid; grid-template-columns:1.12fr .88fr; gap:16px; }
+    .block { border:1px solid var(--line); background:var(--panel); padding:18px; }
+    h3 { margin:0 0 13px; font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--teal); }
+    dl { display:grid; grid-template-columns:auto 1fr; gap:8px 15px; margin:0; }
+    dt { color:var(--muted); } dd { margin:0; font-weight:500; overflow-wrap:anywhere; }
+    .recommendation { border-color:#7ca49a; background:#e5f0eb; }
+    .recommendation strong { display:block; font:700 25px/1.15 "Noto Serif SC", serif; margin-bottom:8px; }
+    .guardrail { margin-top:16px; padding:12px; border:1px dashed var(--orange); background:#fff1d4; font-size:12px; }
+    .actions { display:flex; gap:9px; flex-wrap:wrap; margin-top:18px; }
+    .action { padding:10px 13px; border:1px solid var(--ink); background:var(--ink); color:#fff; }
+    .action.secondary { color:var(--ink); background:transparent; }
+    .action.warn { color:#fff; background:var(--red); border-color:var(--red); }
+    .status { min-height:20px; color:var(--teal); font-size:12px; margin-top:12px; }
+    .empty { padding:25px 0; color:var(--muted); }
+    @media (max-width:800px) { main { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .grid { grid-template-columns:1fr; } .topbar { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">Controlled financial workflow · MVP</p><h1>结算异常复核台</h1></div>
+    <div class="mode" id="mode">加载中：将优先尝试本地 API；无 API 时展示仓库内演示案件。</div>
+  </header>
+  <main>
+    <aside>
+      <div class="meta"><span>待人工决定案件</span><strong id="count">0</strong></div>
+      <div class="filters"><button class="filter active" data-filter="ALL">全部</button><button class="filter" data-filter="P1">P1</button><button class="filter" data-filter="P2">P2</button><button class="filter" data-filter="P3">P3</button></div>
+      <div id="queue"></div>
+    </aside>
+    <article id="detail"><p class="empty">正在整理案件证据…</p></article>
+  </main>
+  <script>
+    const fallbackUrl = './demo_cases.json';
+    const configuredApi = new URLSearchParams(location.search).get('api');
+    let cases = [], selected = null, filter = 'ALL', apiBase = configuredApi || '';
+    const yuan = new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:2});
+    const esc = value => String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    async function getCases() {
+      if (apiBase) {
+        try { const r = await fetch(apiBase + '/cases'); if (!r.ok) throw Error(); document.querySelector('#mode').textContent = '实时模式：读取本地 API；所有资金操作仍被禁用。'; return await r.json(); } catch (_) {}
+      }
+      const r = await fetch(fallbackUrl); document.querySelector('#mode').textContent = '演示模式：使用仓库内脱敏样例；加 ?api=http://localhost:8000 可连本地 API。'; return await r.json();
+    }
+    function visible() { return filter === 'ALL' ? cases : cases.filter(c => c.priority === filter); }
+    function renderQueue() {
+      const items = visible(); document.querySelector('#count').textContent = items.length;
+      document.querySelector('#queue').innerHTML = items.map(c => `<button class="case ${selected?.case_id===c.case_id?'active':''}" data-id="${c.case_id}"><div class="case-head"><span>${esc(c.recon_status)}</span><span class="pill ${c.priority==='P1'?'':c.priority.toLowerCase()}">${esc(c.priority)}</span></div><div class="case-foot"><span>${esc(c.recommended_action)}</span><strong>${yuan.format(Math.abs(c.impact_amount||0))}</strong></div></button>`).join('') || '<p class="empty">没有符合筛选条件的案件。</p>';
+      document.querySelectorAll('.case').forEach(el => el.onclick = () => { selected = cases.find(c => c.case_id === el.dataset.id); renderQueue(); renderDetail(); });
+    }
+    async function enrich(caseData) {
+      if (!apiBase) return caseData;
+      try { const r = await fetch(apiBase + '/cases/' + encodeURIComponent(caseData.case_id)); return r.ok ? await r.json() : caseData; } catch (_) { return caseData; }
+    }
+    async function renderDetail() {
+      if (!selected) return; const current = await enrich(selected); selected = current; const e = current.evidence || {};
+      document.querySelector('#detail').innerHTML = `<div class="case-title"><div><p class="eyebrow">Case ${esc(current.case_id)} · policy ${esc(current.policy_version || 'controlled-review-v1')}</p><h2>${esc(current.recon_status)} / ${esc(current.recommended_action)}</h2></div><div class="money">${yuan.format(Math.abs(current.impact_amount||0))}</div></div><p class="tagline">订单 ${esc(current.order_id)}　·　卖家 ${esc(current.seller_id)}　·　置信度 ${esc(current.confidence)}</p><div class="grid"><section class="block"><h3>Evidence ledger</h3><dl><dt>系统应计 SOR</dt><dd>${yuan.format(e.sor_freight ?? current.sor_freight ?? 0)}</dd><dt>承运商账单</dt><dd>${yuan.format(e.billed_total ?? current.billed_total ?? 0)} / ${esc(e.bill_lines ?? '—')} 条</dd><dt>订单状态</dt><dd>${esc(e.order_status)}</dd><dt>客户签收</dt><dd>${esc(e.customer_delivered_at)}</dd><dt>规则依据</dt><dd>${esc(e.rationale || current.rationale)}</dd></dl></section><section class="block recommendation"><h3>Recommendation only</h3><strong>${esc(current.recommended_action)}</strong><p>${esc(current.rationale)}</p><div class="guardrail">人工审批：必需　/　自动执行：禁用<br>模型只解释已验证证据，不计算金额、不调用资金接口。</div></section></div><div class="actions"><button class="action" data-decision="APPROVED">采纳建议</button><button class="action secondary" data-decision="REJECTED">驳回</button><button class="action warn" data-decision="ESCALATED">升级主管复核</button></div><div class="status" id="status"></div>`;
+      document.querySelectorAll('.action').forEach(button => button.onclick = () => decide(button.dataset.decision));
+    }
+    async function decide(decision) {
+      const reviewer = 'demo-reviewer'; const status = document.querySelector('#status');
+      if (apiBase) { try { const r = await fetch(apiBase + '/cases/' + encodeURIComponent(selected.case_id) + '/human-decision', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision,reviewer,notes:'MVP 演示操作'})}); if (!r.ok) throw Error(); status.textContent = `已记录：${decision}。系统未执行任何资金操作。`; return; } catch (_) {} }
+      localStorage.setItem('settlement-' + selected.case_id, decision); status.textContent = `演示记录：${decision}。真实模式将写入人工审批审计记录；系统不会执行资金操作。`;
+    }
+    document.querySelectorAll('.filter').forEach(button => button.onclick = () => { filter=button.dataset.filter; document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===button)); const items=visible(); selected=items[0]||null; renderQueue(); renderDetail(); });
+    (async () => { cases = await getCases(); selected = cases[0] || null; renderQueue(); renderDetail(); })();
+  </script>
+</body>
+</html>

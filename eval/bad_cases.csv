@@ -1,0 +1,7 @@
+case_id,recon_status,variant,scenario
+B-001,OVERBILLED,missing_order_evidence,金额异常但订单和费用明细缺失
+B-002,UNDERBILLED,missing_order_evidence,少计金额但证据链缺失
+B-003,NOT_DELIVERED,missing_order_evidence,未送达判定但无订单状态
+B-004,DUPLICATE,duplicate_conflict,重复判定但实际只有一条账单
+B-005,OVERBILLED,zero_amount,金额为零或币种税费口径缺失
+B-006,UNDERBILLED,zero_amount,金额为零或币种税费口径缺失

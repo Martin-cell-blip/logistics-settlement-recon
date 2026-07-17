@@ -1,5 +1,5 @@
 """
-audit_agent.py — 对账异常「金额-单据溯源 + 自动复核」Agent
+audit_agent.py — 对账异常「金额-单据溯源 + 受控复核」Copilot
 对 output/recon_exceptions.csv 中的每条异常：
   1) 溯源 trace：从承运商账单金额，回溯到系统 order_items 逐笔运费、订单状态/送达时间戳、容差规则，
      拼出完整证据链（audit trail）——即"这笔钱对不对得上单据"。
@@ -66,9 +66,24 @@ def trace(con: duckdb.DuckDBPyConnection, order_id: str, seller_id: str) -> dict
 
 # 各异常类型的规则化复核逻辑：返回 (裁定, 建议动作, 置信度, 依据)
 def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
+    """Return a *recommendation*, never an executable financial instruction.
+
+    The deterministic reconciliation engine remains the source of truth for
+    amounts.  When required evidence is missing or conflicts with the expected
+    pattern, the safe fallback is human review rather than an AI recommendation.
+    """
     sor, billed_u, n_bill = ev["sor_freight"], ev["billed_unit"], ev["n_bill_lines"]
     order = ev["order"]
     status = order["order_status"] if order else "无订单记录"
+    if recon_status != "MISSING_ORDER" and (order is None or ev["n_items"] == 0):
+        return ("SUSPECT", "人工复核", "低",
+                "缺少订单或费用明细，无法形成完整证据链；系统不输出资金处置建议。")
+    if recon_status == "DUPLICATE" and n_bill < 2:
+        return ("SUSPECT", "人工复核", "低",
+                "重复计费判定与账单行数不一致，需人工检查账单聚合和主数据。")
+    if recon_status in {"OVERBILLED", "UNDERBILLED"} and (sor <= 0 or billed_u <= 0):
+        return ("SUSPECT", "人工复核", "低",
+                "金额证据不完整或为零，需人工确认合同费率、币种和税费口径。")
     if recon_status == "MISSING_ORDER":
         return ("CONFIRMED", "拒付整笔", "高",
                 f"账单 order_id 在系统 order_items 与 orders 中均无记录（幽灵计费），应拒付 {ev['billed_total']:.2f}。")
@@ -159,12 +174,17 @@ def main():
             if llm_text:
                 llm_used += 1
         records.append({
+            "case_id": f"REC-{i + 1:06d}",
             "priority": row.priority, "recon_status": row.recon_status,
             "order_id": row.order_id, "seller_id": row.seller_id,
             "sor_freight": ev["sor_freight"], "billed_total": ev["billed_total"],
             "impact_amount": row.impact_amount,
             "verdict": verdict, "recommended_action": action, "confidence": conf,
             "rationale": rationale,
+            "requires_human_approval": True,
+            "auto_execution_allowed": False,
+            "policy_version": "controlled-review-v1",
+            "model_output_role": "evidence_summary_only",
         })
         if i < args.top:
             memos.append(memo(row, ev, verdict, action, conf, rationale, llm_text))
@@ -175,7 +195,7 @@ def main():
 
     # 人读审计备忘
     head = [
-        "# 对账异常自动复核报告（金额-单据溯源 + Agent 复核）",
+        "# 对账异常受控复核报告（金额-单据溯源 + Copilot 建议）",
         f"> 共复核异常 {len(rev):,} 条；下列为金额影响 Top {min(args.top, len(rev))} 的审计备忘。"
         + ("　（含 LLM 研判）" if llm_used else "　（规则引擎复核；加 --llm 且配置 ANTHROPIC_API_KEY 可启用 Claude 研判）"),
         "",
