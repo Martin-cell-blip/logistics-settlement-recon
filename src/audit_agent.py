@@ -5,18 +5,22 @@ audit_agent.py — 对账异常「金额-单据溯源 + 受控复核」Copilot
      拼出完整证据链（audit trail）——即"这笔钱对不对得上单据"。
   2) 复核 review：基于证据链给出 裁定(CONFIRMED/SUSPECT/PASS) + 建议动作(拒付/追回/催开票/人工复核)
      + 依据 + 置信度。默认用内置规则引擎（离线、确定性、覆盖全部异常）。
-  3) 可选 LLM 复核：加 --llm 且设置了 ANTHROPIC_API_KEY 时，对 top-N 条调用 Claude 做自然语言研判，
-     体现"AI Agent 复核"能力；无密钥则自动跳过，不影响主流程。
+  3) 可选模型摘要：加 --llm 且设置了 ANTHROPIC_API_KEY 时，对 top-N 条生成结构化证据摘要。
+     输出必须与规则裁定一致并引用现有证据，否则自动回退规则理由。
 
 输出：output/exception_review.csv（结构化，全部异常）+ output/exception_review.md（人读审计备忘，top-N）
 运行：PYTHONUTF8=1 python src/audit_agent.py [--top 25] [--llm]
 """
 from __future__ import annotations
 import argparse
-import os
 from pathlib import Path
 import duckdb
 import pandas as pd
+
+try:
+    from .model_review import ModelReviewResult, generate_model_review
+except ImportError:  # pragma: no cover - direct script execution
+    from model_review import ModelReviewResult, generate_model_review
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
@@ -84,6 +88,29 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
     if recon_status in {"OVERBILLED", "UNDERBILLED"} and (sor <= 0 or billed_u <= 0):
         return ("SUSPECT", "人工复核", "低",
                 "金额证据不完整或为零，需人工确认合同费率、币种和税费口径。")
+    delivered_at = order.get("order_delivered_customer_date") if order else None
+    if recon_status == "MISSING_ORDER" and (order is not None or ev["n_items"] > 0):
+        return ("SUSPECT", "人工复核", "低",
+                "幽灵计费判定与订单或费用明细冲突，需人工检查关联键和主数据。")
+    if recon_status == "NOT_DELIVERED" and (
+        status == "delivered" or bool(delivered_at)
+    ):
+        return ("SUSPECT", "人工复核", "低",
+                "未送达判定与订单状态或签收时间冲突，需人工检查状态同步。")
+    if recon_status == "DUPLICATE" and ev["billed_total"] <= billed_u:
+        return ("SUSPECT", "人工复核", "低",
+                "重复计费判定与账单合计不一致，需人工检查账单聚合。")
+    if recon_status == "OVERBILLED" and billed_u <= sor:
+        return ("SUSPECT", "人工复核", "低",
+                "超额计费判定与金额方向冲突，需人工检查容差、币种和税费口径。")
+    if recon_status == "UNDERBILLED" and billed_u >= sor:
+        return ("SUSPECT", "人工复核", "低",
+                "少计判定与金额方向冲突，需人工检查容差、币种和税费口径。")
+    if recon_status == "NOT_BILLED" and (
+        status != "delivered" or not delivered_at
+    ):
+        return ("SUSPECT", "人工复核", "低",
+                "漏计应付判定缺少已送达证据，需人工确认服务是否实际发生。")
     if recon_status == "MISSING_ORDER":
         return ("CONFIRMED", "拒付整笔", "高",
                 f"账单 order_id 在系统 order_items 与 orders 中均无记录（幽灵计费），应拒付 {ev['billed_total']:.2f}。")
@@ -106,36 +133,15 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
     return ("PASS", "无需处理", "高", "账单与系统一致，在容差内。")
 
 
-LLM_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
-
-
-def review_with_llm(recon_status: str, ev: dict) -> str | None:
-    """可选：调用 Claude 对证据链做自然语言研判。无 SDK 或无密钥则返回 None。"""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return None
-    try:
-        import anthropic
-    except ImportError:
-        return None
-    order = ev["order"] or {}
-    prompt = (
-        "你是物流结算对账复核员。基于以下证据链判断该承运商账单是否应支付，"
-        "给出：裁定(确认异常/疑似/放行)、建议动作、一句话依据。\n\n"
-        f"对账系统初判：{recon_status}\n"
-        f"系统应计运费(SOR)={ev['sor_freight']}（{ev['n_items']}个明细）\n"
-        f"订单状态={order.get('order_status')}，客户签收时间={order.get('order_delivered_customer_date')}\n"
-        f"承运商账单：{ev['n_bill_lines']}条，合计={ev['billed_total']}，单笔={ev['billed_unit']}\n"
-    )
-    try:
-        client = anthropic.Anthropic()
-        msg = client.messages.create(model=LLM_MODEL, max_tokens=300,
-                                     messages=[{"role": "user", "content": prompt}])
-        return msg.content[0].text.strip()
-    except Exception as e:
-        return f"[LLM 调用失败：{e}]"
-
-
-def memo(row, ev: dict, verdict, action, conf, rationale, llm_text=None) -> str:
+def memo(
+    row,
+    ev: dict,
+    verdict,
+    action,
+    conf,
+    rationale,
+    model_result: ModelReviewResult | None = None,
+) -> str:
     order = ev["order"] or {}
     lines = [
         f"### [{row.priority}] {row.recon_status} — order `{row.order_id[:12]}…` / seller `{row.seller_id[:8]}…`",
@@ -145,15 +151,26 @@ def memo(row, ev: dict, verdict, action, conf, rationale, llm_text=None) -> str:
         f"- **复核裁定**：**{verdict}** → 建议：**{action}**（置信度 {conf}）",
         f"- **依据**：{rationale}",
     ]
-    if llm_text:
-        lines.append(f"- **LLM 研判**：{llm_text}")
+    if model_result:
+        lines.extend([
+            f"- **模型状态**：`{model_result.status}` / `{model_result.provider}` / "
+            f"`{model_result.model}` / prompt `{model_result.prompt_version}`",
+            f"- **结构化证据摘要**：{model_result.review.explanation}",
+            f"- **模型证据引用**：{', '.join(model_result.review.evidence_ids)}",
+        ])
+        if model_result.guardrail_reasons:
+            lines.append(f"- **回退原因**：{'；'.join(model_result.guardrail_reasons)}")
     return "\n".join(lines)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--top", type=int, default=25, help="生成审计备忘的异常条数(按金额影响)")
-    ap.add_argument("--llm", action="store_true", help="对 top 条启用 Claude LLM 复核(需 ANTHROPIC_API_KEY)")
+    ap.add_argument(
+        "--llm",
+        action="store_true",
+        help="对 top 条启用结构化模型证据摘要(需 ANTHROPIC_API_KEY)",
+    )
     args = ap.parse_args()
 
     exc = pd.read_csv(OUT / "recon_exceptions.csv")
@@ -168,10 +185,12 @@ def main():
     for i, row in enumerate(exc.itertuples(index=False)):
         ev = trace(con, row.order_id, row.seller_id)
         verdict, action, conf, rationale = review(row.recon_status, ev)
-        llm_text = None
+        model_result = None
         if args.llm and i < args.top:
-            llm_text = review_with_llm(row.recon_status, ev)
-            if llm_text:
+            model_result = generate_model_review(
+                row.recon_status, ev, verdict, action, conf, rationale
+            )
+            if model_result.status == "generated":
                 llm_used += 1
         records.append({
             "case_id": f"REC-{i + 1:06d}",
@@ -183,11 +202,11 @@ def main():
             "rationale": rationale,
             "requires_human_approval": True,
             "auto_execution_allowed": False,
-            "policy_version": "controlled-review-v1",
+            "policy_version": "controlled-review-v2",
             "model_output_role": "evidence_summary_only",
         })
         if i < args.top:
-            memos.append(memo(row, ev, verdict, action, conf, rationale, llm_text))
+            memos.append(memo(row, ev, verdict, action, conf, rationale, model_result))
     con.close()
 
     rev = pd.DataFrame(records)
@@ -197,7 +216,11 @@ def main():
     head = [
         "# 对账异常受控复核报告（金额-单据溯源 + Copilot 建议）",
         f"> 共复核异常 {len(rev):,} 条；下列为金额影响 Top {min(args.top, len(rev))} 的审计备忘。"
-        + ("　（含 LLM 研判）" if llm_used else "　（规则引擎复核；加 --llm 且配置 ANTHROPIC_API_KEY 可启用 Claude 研判）"),
+        + (
+            "　（含通过护栏校验的模型证据摘要）"
+            if llm_used
+            else "　（规则引擎复核；加 --llm 且配置 ANTHROPIC_API_KEY 可请求结构化模型摘要）"
+        ),
         "",
         "## 复核汇总",
         rev.groupby(["verdict", "recommended_action"]).agg(
@@ -217,7 +240,10 @@ def main():
     recover = rev.loc[rev["recommended_action"].isin(["追回差额", "拒付整笔", "拒付重复部分"]), "impact_amount"].abs().sum()
     print(f"\n可拒付/追回金额合计 ≈ {recover:,.2f}")
     if args.llm:
-        print(f"LLM 研判条数：{llm_used}" + ("" if llm_used else "（未启用：缺 ANTHROPIC_API_KEY 或 anthropic SDK）"))
+        print(
+            f"通过护栏校验的模型摘要：{llm_used}"
+            + ("" if llm_used else "（未启用、调用失败或被护栏回退）")
+        )
 
 
 if __name__ == "__main__":

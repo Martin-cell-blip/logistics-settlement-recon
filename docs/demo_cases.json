@@ -12,7 +12,7 @@
     "rationale": "同一订单出现 2 条承运商账单；系统应计 428.60，重复部分与原单等额。",
     "requires_human_approval": true,
     "auto_execution_allowed": false,
-    "policy_version": "controlled-review-v1",
+    "policy_version": "controlled-review-v2",
     "evidence": {"sor_freight": 428.6, "billed_total": 857.2, "bill_lines": 2, "order_status": "delivered", "customer_delivered_at": "2018-08-20 11:00", "rationale": "账单行数和金额均显示重复计费；建议拒付重复部分。"}
   },
   {
@@ -28,7 +28,7 @@
     "rationale": "账单订单号在订单明细和订单主表中均不存在。",
     "requires_human_approval": true,
     "auto_execution_allowed": false,
-    "policy_version": "controlled-review-v1",
+    "policy_version": "controlled-review-v2",
     "evidence": {"sor_freight": 0, "billed_total": 316.4, "bill_lines": 1, "order_status": "无订单记录", "customer_delivered_at": null, "rationale": "缺少系统订单记录；该建议须由人工确认后才可拒付。"}
   },
   {
@@ -44,7 +44,7 @@
     "rationale": "账单金额高于系统应计且超出 ±2% 容差；仍需人工核验合同版本和税费口径。",
     "requires_human_approval": true,
     "auto_execution_allowed": false,
-    "policy_version": "controlled-review-v1",
+    "policy_version": "controlled-review-v2",
     "evidence": {"sor_freight": 244.2, "billed_total": 319.0, "bill_lines": 1, "order_status": "delivered", "customer_delivered_at": "2018-08-17 15:45", "rationale": "金额差异为 74.80；模型不参与金额计算或资金执行。"}
   }
 ]

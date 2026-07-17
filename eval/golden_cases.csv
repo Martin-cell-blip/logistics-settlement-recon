@@ -1,25 +1,22 @@
-case_id,recon_status,variant,expected_verdict,expected_action
-G-001,MISSING_ORDER,normal,CONFIRMED,拒付整笔
-G-002,MISSING_ORDER,normal,CONFIRMED,拒付整笔
-G-003,MISSING_ORDER,normal,CONFIRMED,拒付整笔
-G-004,MISSING_ORDER,normal,CONFIRMED,拒付整笔
-G-005,NOT_DELIVERED,normal,CONFIRMED,拒付整笔
-G-006,NOT_DELIVERED,normal,CONFIRMED,拒付整笔
-G-007,NOT_DELIVERED,normal,CONFIRMED,拒付整笔
-G-008,NOT_DELIVERED,normal,CONFIRMED,拒付整笔
-G-009,DUPLICATE,normal,CONFIRMED,拒付重复部分
-G-010,DUPLICATE,normal,CONFIRMED,拒付重复部分
-G-011,DUPLICATE,normal,CONFIRMED,拒付重复部分
-G-012,DUPLICATE,normal,CONFIRMED,拒付重复部分
-G-013,OVERBILLED,normal,CONFIRMED,追回差额
-G-014,OVERBILLED,normal,CONFIRMED,追回差额
-G-015,OVERBILLED,normal,CONFIRMED,追回差额
-G-016,OVERBILLED,normal,CONFIRMED,追回差额
-G-017,UNDERBILLED,normal,SUSPECT,人工复核/确认成本
-G-018,UNDERBILLED,normal,SUSPECT,人工复核/确认成本
-G-019,UNDERBILLED,normal,SUSPECT,人工复核/确认成本
-G-020,UNDERBILLED,normal,SUSPECT,人工复核/确认成本
-G-021,NOT_BILLED,normal,SUSPECT,催承运商开票/确认应付
-G-022,NOT_BILLED,normal,SUSPECT,催承运商开票/确认应付
-G-023,NOT_BILLED,normal,SUSPECT,催承运商开票/确认应付
-G-024,NOT_BILLED,normal,SUSPECT,催承运商开票/确认应付
+case_id,scenario,recon_status,sor_freight,n_items,order_present,order_status,delivered_at,billed_total,billed_unit,n_bill_lines,expected_verdict,expected_action
+G-001,幽灵单-小额,MISSING_ORDER,0,0,false,,,38.5,38.5,1,CONFIRMED,拒付整笔
+G-002,幽灵单-多行,MISSING_ORDER,0,0,false,,,240,120,2,CONFIRMED,拒付整笔
+G-003,幽灵单-高额,MISSING_ORDER,0,0,false,,,1250,1250,1,CONFIRMED,拒付整笔
+G-004,运输中却计费,NOT_DELIVERED,88,1,true,shipped,,88,88,1,CONFIRMED,拒付整笔
+G-005,处理中却计费,NOT_DELIVERED,45,2,true,processing,,45,45,1,CONFIRMED,拒付整笔
+G-006,取消订单仍计费,NOT_DELIVERED,132,1,true,canceled,,132,132,1,CONFIRMED,拒付整笔
+G-007,两条重复账单,DUPLICATE,100,1,true,delivered,2018-08-20 11:00:00,200,100,2,CONFIRMED,拒付重复部分
+G-008,三条重复账单,DUPLICATE,90,2,true,delivered,2018-08-21 09:30:00,270,90,3,CONFIRMED,拒付重复部分
+G-009,小数金额重复,DUPLICATE,75.5,1,true,delivered,2018-08-22 15:00:00,151,75.5,2,CONFIRMED,拒付重复部分
+G-010,超额30%,OVERBILLED,100,1,true,delivered,2018-08-20 11:00:00,130,130,1,CONFIRMED,追回差额
+G-011,超额27.5%,OVERBILLED,40,2,true,delivered,2018-08-21 09:30:00,51,51,1,CONFIRMED,追回差额
+G-012,超额25%,OVERBILLED,200,3,true,delivered,2018-08-22 15:00:00,250,250,1,CONFIRMED,追回差额
+G-013,少计30%,UNDERBILLED,100,1,true,delivered,2018-08-20 11:00:00,70,70,1,SUSPECT,人工复核/确认成本
+G-014,少计25%,UNDERBILLED,80,2,true,delivered,2018-08-21 09:30:00,60,60,1,SUSPECT,人工复核/确认成本
+G-015,少计20%,UNDERBILLED,250,3,true,delivered,2018-08-22 15:00:00,200,200,1,SUSPECT,人工复核/确认成本
+G-016,已送达未开票-单明细,NOT_BILLED,100,1,true,delivered,2018-08-20 11:00:00,0,0,0,SUSPECT,催承运商开票/确认应付
+G-017,已送达未开票-多明细,NOT_BILLED,185,3,true,delivered,2018-08-21 09:30:00,0,0,0,SUSPECT,催承运商开票/确认应付
+G-018,已送达未开票-小额,NOT_BILLED,28.6,1,true,delivered,2018-08-22 15:00:00,0,0,0,SUSPECT,催承运商开票/确认应付
+G-019,容差内完全匹配,MATCH,100,1,true,delivered,2018-08-20 11:00:00,100,100,1,PASS,无需处理
+G-020,容差内轻微差异,MATCH,100,2,true,delivered,2018-08-21 09:30:00,101,101,1,PASS,无需处理
+G-021,小数金额匹配,MATCH,37.25,1,true,delivered,2018-08-22 15:00:00,37.25,37.25,1,PASS,无需处理

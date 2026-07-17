@@ -1,7 +1,11 @@
-case_id,recon_status,variant,scenario
-B-001,OVERBILLED,missing_order_evidence,金额异常但订单和费用明细缺失
-B-002,UNDERBILLED,missing_order_evidence,少计金额但证据链缺失
-B-003,NOT_DELIVERED,missing_order_evidence,未送达判定但无订单状态
-B-004,DUPLICATE,duplicate_conflict,重复判定但实际只有一条账单
-B-005,OVERBILLED,zero_amount,金额为零或币种税费口径缺失
-B-006,UNDERBILLED,zero_amount,金额为零或币种税费口径缺失
+case_id,scenario,recon_status,sor_freight,n_items,order_present,order_status,delivered_at,billed_total,billed_unit,n_bill_lines,expected_verdict,expected_action
+B-001,超额但订单证据缺失,OVERBILLED,100,0,false,,,130,130,1,SUSPECT,人工复核
+B-002,少计但订单证据缺失,UNDERBILLED,100,0,false,,,70,70,1,SUSPECT,人工复核
+B-003,未送达但订单状态缺失,NOT_DELIVERED,100,0,false,,,100,100,1,SUSPECT,人工复核
+B-004,重复判定但只有一条账单,DUPLICATE,100,1,true,delivered,2018-08-20 11:00:00,100,100,1,SUSPECT,人工复核
+B-005,超额但金额证据为零,OVERBILLED,0,1,true,delivered,2018-08-20 11:00:00,0,0,1,SUSPECT,人工复核
+B-006,少计但金额证据为零,UNDERBILLED,0,1,true,delivered,2018-08-20 11:00:00,0,0,1,SUSPECT,人工复核
+B-007,幽灵单判定却存在订单,MISSING_ORDER,100,1,true,delivered,2018-08-20 11:00:00,120,120,1,SUSPECT,人工复核
+B-008,未送达判定却已有签收,NOT_DELIVERED,100,1,true,delivered,2018-08-20 11:00:00,100,100,1,SUSPECT,人工复核
+B-009,超额判定但账单金额更低,OVERBILLED,100,1,true,delivered,2018-08-20 11:00:00,90,90,1,SUSPECT,人工复核
+B-010,漏计应付但缺少送达证明,NOT_BILLED,100,1,true,shipped,,0,0,0,SUSPECT,人工复核
