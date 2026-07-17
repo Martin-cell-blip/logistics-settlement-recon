@@ -18,6 +18,6 @@ jobs:
       - name: Compile Python modules
         run: python -m compileall -q src tests
       - name: Run automated tests
-        run: pytest -q
+        run: python -m pytest -q
       - name: Run offline evaluation
         run: python src/evaluate_copilot.py
