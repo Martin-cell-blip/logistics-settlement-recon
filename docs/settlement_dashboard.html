@@ -18,8 +18,8 @@
   h1{font-size:26px;color:var(--navy);letter-spacing:.5px}
   .sub{color:var(--muted);font-size:13px;margin-top:6px}
   .sub a{color:var(--blue);text-decoration:none}
-  h2{font-size:17px;color:var(--navy);margin:30px 0 14px;padding-left:10px;
-    border-left:4px solid var(--blue)}
+  h2{font-size:17px;color:var(--navy);margin:30px 0 14px;padding-bottom:7px;
+    border-bottom:1px solid var(--blue)}
   .grid{display:grid;gap:14px}
   .kpis{grid-template-columns:repeat(6,1fr)}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 12px;
@@ -75,7 +75,7 @@
   </div>
 
   <!-- 三方对账 -->
-  <h2>一、三方对账结果（系统应计 × 送达确认 × 承运商账单）</h2>
+  <h2>三方对账结果（系统应计 × 送达确认 × 承运商账单）</h2>
   <div class="grid two">
     <div class="card">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">对账判定分布（按笔数）</div>
@@ -99,12 +99,12 @@
         <tr><td>金额错配</td><td class="n">5,807</td><td class="n">99.7%</td></tr>
         <tr><td><b>异常总体</b></td><td class="n"><b>13,318</b></td><td class="n"><b>99.9%</b></td></tr>
       </table>
-      <div class="callout" style="margin-top:12px">用合成账单时注入的已知差异作真值验证，证明引擎"该抓的都抓到了"——金额错配漏的 0.3% 是落在 ±2% 容差内、本就应判匹配的边界项。</div>
+      <div class="callout" style="margin-top:12px">用合成账单时注入的已知差异作真值验证，证明引擎“该抓的都抓到了”：金额错配漏掉的 0.3% 落在 ±2% 容差内，本就应判为匹配的边界项。</div>
     </div>
   </div>
 
   <!-- 异常复核 -->
-  <h2>二、异常自动复核与处置建议（金额-单据溯源 Agent）</h2>
+  <h2>异常受控复核与人工审批建议（金额-单据溯源 Copilot）</h2>
   <div class="grid two">
     <div class="card">
       <table>
@@ -115,7 +115,7 @@
         <tr><td>疑似</td><td><span class="tag t-chk">人工复核</span></td><td class="n">2,357</td><td class="n">−14,730</td></tr>
         <tr><td>疑似</td><td><span class="tag t-chk">催开票/确认应付</span></td><td class="n">2,922</td><td class="n">−65,281</td></tr>
       </table>
-      <div class="callout" style="margin-top:12px"><b>可直接拒付 / 追回 ≈ ¥139,511</b>；另有 ¥65,281 漏计应付需催承运商开票并计提。</div>
+      <div class="callout" style="margin-top:12px"><b>可供人工拒付 / 追回的潜在金额约 ¥139,511</b>；另有 ¥65,281 漏计应付需催承运商开票并计提。</div>
     </div>
     <div class="card">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Top 异常（按金额影响）</div>
@@ -132,7 +132,7 @@
   </div>
 
   <!-- 应收账龄 -->
-  <h2>三、应收账款账龄 · DSO · 坏账(ECL)计提</h2>
+  <h2>应收账款账龄 · DSO · 坏账(ECL)计提</h2>
   <div class="grid two">
     <div class="card">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">账龄五桶分布（未结应收 ¥431,606）</div>
@@ -150,10 +150,10 @@
         <tr><td>DSO 应收周转天数</td><td class="n">53.7 天</td><td class="n">≈31 天</td></tr>
         <tr><td>加权坏账率(ECL)</td><td class="n">2.66%</td><td class="n">1.8%</td></tr>
         <tr><td>90+ 占应收比</td><td class="n">0.97%</td><td class="n">1.1%</td></tr>
-        <tr><td>坏账计提总额</td><td class="n">11,474</td><td class="n">—</td></tr>
-        <tr><td>近 365 天已核销</td><td class="n">35,962</td><td class="n">—</td></tr>
+        <tr><td>坏账计提总额</td><td class="n">11,474</td><td class="n">未提供</td></tr>
+        <tr><td>近 365 天已核销</td><td class="n">35,962</td><td class="n">未提供</td></tr>
       </table>
-      <div class="callout" style="margin-top:12px">账簿整体健康（90+ 占比 &lt;1%），<b>但 DSO 显著高于京东（54 vs 31 天）</b>——指向"催收提速 / 账期治理"的改善空间，正是结算运营岗的价值切口。</div>
+      <div class="callout" style="margin-top:12px">账簿整体健康（90+ 占比 &lt;1%），<b>但 DSO 显著高于京东（54 vs 31 天）</b>，说明“催收提速 / 账期治理”仍有改善空间，正是结算运营岗的价值切口。</div>
       <div class="note">*京东物流数据来自其 2024 年报附注（见配套行研报告）。</div>
     </div>
   </div>

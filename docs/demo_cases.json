@@ -1,0 +1,50 @@
+[
+  {
+    "case_id": "REC-DEMO-001",
+    "priority": "P1",
+    "recon_status": "DUPLICATE",
+    "order_id": "a6f124ab93b2d7a4",
+    "seller_id": "f5a86231",
+    "impact_amount": 428.6,
+    "verdict": "CONFIRMED",
+    "recommended_action": "拒付重复部分",
+    "confidence": "高",
+    "rationale": "同一订单出现 2 条承运商账单；系统应计 428.60，重复部分与原单等额。",
+    "requires_human_approval": true,
+    "auto_execution_allowed": false,
+    "policy_version": "controlled-review-v2",
+    "evidence": {"sor_freight": 428.6, "billed_total": 857.2, "bill_lines": 2, "order_status": "delivered", "customer_delivered_at": "2018-08-20 11:00", "rationale": "账单行数和金额均显示重复计费；建议拒付重复部分。"}
+  },
+  {
+    "case_id": "REC-DEMO-002",
+    "priority": "P1",
+    "recon_status": "MISSING_ORDER",
+    "order_id": "carrier-only-5981",
+    "seller_id": "f5a86231",
+    "impact_amount": 316.4,
+    "verdict": "CONFIRMED",
+    "recommended_action": "拒付整笔",
+    "confidence": "高",
+    "rationale": "账单订单号在订单明细和订单主表中均不存在。",
+    "requires_human_approval": true,
+    "auto_execution_allowed": false,
+    "policy_version": "controlled-review-v2",
+    "evidence": {"sor_freight": 0, "billed_total": 316.4, "bill_lines": 1, "order_status": "无订单记录", "customer_delivered_at": null, "rationale": "缺少系统订单记录；该建议须由人工确认后才可拒付。"}
+  },
+  {
+    "case_id": "REC-DEMO-003",
+    "priority": "P2",
+    "recon_status": "OVERBILLED",
+    "order_id": "b9d3180985d719a2",
+    "seller_id": "0f63f0d7",
+    "impact_amount": 74.8,
+    "verdict": "CONFIRMED",
+    "recommended_action": "追回差额",
+    "confidence": "中",
+    "rationale": "账单金额高于系统应计且超出 ±2% 容差；仍需人工核验合同版本和税费口径。",
+    "requires_human_approval": true,
+    "auto_execution_allowed": false,
+    "policy_version": "controlled-review-v2",
+    "evidence": {"sor_freight": 244.2, "billed_total": 319.0, "bill_lines": 1, "order_status": "delivered", "customer_delivered_at": "2018-08-17 15:45", "rationale": "金额差异为 74.80；模型不参与金额计算或资金执行。"}
+  }
+]
