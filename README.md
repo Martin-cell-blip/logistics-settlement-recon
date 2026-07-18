@@ -11,8 +11,6 @@
 
 > 📊 **可视化报告**：[docs/settlement_dashboard.html](docs/settlement_dashboard.html)（KPI 卡片 + 对账分布 + 账龄柱状 + Top 异常，可打印 PDF）
 
-> 面向岗位：京东物流「财务结算运营（Bill Reconciliation & Settlement）」实习。项目职责一一对应对账、异常处理、应收账龄、坏账监控、结算自动化、数据分析报表。
-
 ---
 
 ## 为什么这么设计
@@ -115,22 +113,6 @@ SUSPECT     催承运商开票/确认应付(漏计) 2,922   −65,281
 可直接拒付/追回金额合计 ≈ 139,511；另有 6.5 万漏计应付需催票入账
 ```
 产出：`exception_review.csv`（全部异常的结构化裁定）+ `exception_review.md`（Top-N 人读审计备忘，逐条含溯源证据链）。
-
-## 技术栈与 JD 对应
-| JD 要求 | 本项目对应 |
-|---|---|
-| Reconciliation / Exception handling | 三方对账引擎 + 异常清单(带优先级/金额影响) |
-| AR aging / Bad-debt monitoring | 五桶账龄 + DSO + ECL 计提 + 坏账候选清单 |
-| SQL / Python / Excel / Power BI | DuckDB SQL(CTE/窗口函数/全外连接) + Python 流水线 + Excel 报表(可接 Power BI) |
-| Process optimization / automation | 全流程脚本化、一键复现，替代人工逐笔核对 |
-| Data analysis & reporting | 汇总表 + 多 sheet Excel 报表 |
-
-## 简历 bullet（示意）
-> **电商物流结算自动对账工具（个人项目）** — 基于 Olist 10 万+ 电商订单，用 **DuckDB SQL** 构建
-> 订单×承运商×合同容差的**三方对账引擎**，自动分类匹配/超额/重复/幽灵单/未送达/漏计并输出带优先级的
-> 异常清单，注入真值验证**异常识别查全率 99.9%**；用 **Python** 搭建**应收账款五桶账龄 + DSO + 坏账 ECL 计提**（ECL 率对标京东物流年报），
-> 生成坏账候选与按客户应收暴露报表；并构建**异常金额-单据溯源 + 自动复核 Agent**（可挂 Claude LLM 研判），
-> 自动输出拒付/追回/催票处置建议、识别可追回金额约 14 万，对账+复核+报表工时从小时级压缩到分钟级。
 
 ## 已知 TODO（下一版）
 - ✅ **回款模型校准（已完成）**：引入"核销出账"逻辑，DSO/90+/加权坏账率已落到健康区间（见上）。
