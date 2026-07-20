@@ -21,7 +21,7 @@
     .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:12px; margin-bottom:18px; }
     .filters { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px; }
     button { min-height:44px; font:inherit; cursor:pointer; }
-    button:focus-visible,input:focus-visible,textarea:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+    button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
     .filter { padding:8px 11px; border:1px solid var(--line); background:transparent; color:var(--muted); }
     .filter.active { color:#fff; background:var(--teal); border-color:var(--teal); }
     .case { width:100%; text-align:left; padding:15px 12px; border:1px solid var(--line); border-bottom:none; background:var(--panel); transition:.18s ease; }
@@ -31,6 +31,16 @@
     .case-head { font-weight:600; } .case-foot { margin-top:8px; color:var(--muted); font-size:12px; }
     .pill { display:inline-block; padding:2px 6px; color:#fff; background:var(--orange); font-size:11px; line-height:1.3; }
     .pill.p2 { background:var(--teal); } .pill.p3 { background:#7b847e; }
+    .case-builder { margin:0 0 18px; border:1px solid #89a79f; background:#f9fcfb; }
+    .case-builder summary { display:flex; justify-content:space-between; gap:12px; padding:13px; color:var(--teal); font-weight:700; cursor:pointer; list-style:none; }
+    .case-builder summary::-webkit-details-marker { display:none; }
+    .case-builder summary::after { content:"展开"; color:var(--muted); font-size:12px; font-weight:500; }
+    .case-builder[open] summary::after { content:"收起"; }
+    .builder-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 13px 14px; border-top:1px solid var(--line); }
+    .builder-form label { display:grid; gap:5px; padding-top:12px; color:var(--muted); font-size:12px; }
+    .builder-form .wide { grid-column:1/-1; }
+    .builder-actions { display:flex; flex-wrap:wrap; gap:8px; grid-column:1/-1; padding-top:2px; }
+    .form-status { grid-column:1/-1; min-height:18px; color:var(--red); font-size:12px; }
     article { padding:30px clamp(22px,4vw,68px) 54px; max-width:1100px; }
     .case-title { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; border-bottom:1px solid var(--ink); padding-bottom:20px; }
     h2 { margin:5px 0 0; font:750 clamp(23px,3vw,34px)/1.08 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; letter-spacing:-.025em; text-wrap:balance; overflow-wrap:anywhere; }
@@ -53,7 +63,7 @@
     .review-form { display:grid; grid-template-columns:minmax(180px,.55fr) 1fr; gap:10px; margin-top:18px; }
     .review-form label { display:grid; gap:5px; color:var(--muted); font-size:12px; }
     .review-form label:last-child { grid-column:1/-1; }
-    input,textarea { width:100%; min-height:44px; border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:9px 10px; font:inherit; }
+    input,textarea,select { width:100%; min-height:44px; border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:9px 10px; font:inherit; }
     input::placeholder,textarea::placeholder { color:var(--muted); opacity:1; }
     textarea { min-height:88px; resize:vertical; }
     .model-panel { margin-top:15px; padding:14px; border:1px solid #d1b967; background:#fff8db; }
@@ -61,7 +71,7 @@
     .model-panel[data-status="fallback"],.model-panel[data-status="disabled"] { border-color:#c88b70; }
     .model-meta { color:var(--muted); font-size:11px; margin-top:7px; overflow-wrap:anywhere; }
     .empty { padding:25px 0; color:var(--muted); }
-    @media (max-width:800px) { main { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .grid,.review-form { grid-template-columns:1fr; } .review-form label:last-child { grid-column:auto; } .topbar { align-items:flex-start; flex-direction:column; } .top-actions { justify-items:start; } .top-links { justify-content:flex-start; } }
+    @media (max-width:800px) { main { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .grid,.review-form,.builder-form { grid-template-columns:1fr; } .review-form label:last-child,.builder-form .wide { grid-column:auto; } .builder-actions,.form-status { grid-column:auto; } .topbar { align-items:flex-start; flex-direction:column; } .top-actions { justify-items:start; } .top-links { justify-content:flex-start; } }
     @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; transition:none !important; } }
   </style>
 </head>
@@ -78,6 +88,41 @@
   </header>
   <main>
     <aside>
+      <details class="case-builder" id="case-builder">
+        <summary>新建模拟对账案件</summary>
+        <form class="builder-form" id="case-form">
+          <label class="wide">订单号
+            <input id="order-input" required maxlength="40" value="ORDER-SIM-001" placeholder="例如 ORDER-SIM-001">
+          </label>
+          <label>卖家编号
+            <input id="seller-input" required maxlength="40" value="SELLER-TEST" placeholder="例如 SELLER-TEST">
+          </label>
+          <label>订单状态
+            <select id="order-status-input">
+              <option value="delivered">已签收</option>
+              <option value="not_delivered">未签收</option>
+              <option value="missing_order">订单缺失</option>
+            </select>
+          </label>
+          <label>系统应计金额
+            <input id="sor-input" required type="number" min="0" step="0.01" value="100">
+          </label>
+          <label>承运商账单金额
+            <input id="billed-input" required type="number" min="0" step="0.01" value="125">
+          </label>
+          <label>账单行数
+            <input id="lines-input" required type="number" min="0" max="99" step="1" value="1">
+          </label>
+          <label>费用明细数
+            <input id="items-input" required type="number" min="0" max="99" step="1" value="1">
+          </label>
+          <div class="builder-actions">
+            <button class="action" type="submit">生成异常案件</button>
+            <button class="action secondary" id="clear-custom" type="button">清空自建案件</button>
+          </div>
+          <div class="form-status" id="form-status" role="status" aria-live="polite"></div>
+        </form>
+      </details>
       <div class="meta"><span>待人工决定案件</span><strong id="count">0</strong></div>
       <div class="filters" aria-label="案件优先级筛选"><button class="filter active" data-filter="ALL" aria-pressed="true">全部</button><button class="filter" data-filter="P1" aria-pressed="false">P1</button><button class="filter" data-filter="P2" aria-pressed="false">P2</button><button class="filter" data-filter="P3" aria-pressed="false">P3</button></div>
       <div id="queue"></div>
@@ -87,12 +132,86 @@
   <script>
     const fallbackUrl = './demo_cases.json';
     const configuredApi = new URLSearchParams(location.search).get('api');
+    const CUSTOM_CASES_KEY = 'settlement-custom-cases-v1';
     let cases = [], selected = null, filter = 'ALL', apiBase = configuredApi || '';
     const sessionId = localStorage.getItem('settlement-session') || `session-${crypto.randomUUID()}`;
     localStorage.setItem('settlement-session', sessionId);
     const yuan = new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:2});
-    const esc = value => String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const esc = value => String(value ?? '未录入').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const newId = prefix => `${prefix}-${crypto.randomUUID()}`;
+    const usesApi = caseData => Boolean(apiBase && !caseData?.custom);
+
+    function loadCustomCases() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(CUSTOM_CASES_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed.filter(item => item?.custom && item?.case_id) : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function saveCustomCases() {
+      localStorage.setItem(CUSTOM_CASES_KEY, JSON.stringify(cases.filter(item => item.custom)));
+    }
+
+    function getSavedDecision(caseId) {
+      try {
+        return JSON.parse(localStorage.getItem('settlement-' + caseId) || '{}');
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function classifyCase({sor, billed, billLines, orderStatus}) {
+      const difference = Number((billed - sor).toFixed(2));
+      if (orderStatus === 'missing_order') {
+        return {recon_status:'MISSING_ORDER', priority:'P1', impact_amount:billed, verdict:'CONFIRMED', recommended_action:'拒付整笔账单', confidence:'HIGH', rationale:'承运商账单存在，但订单主数据缺失，无法建立有效结算依据。'};
+      }
+      if (orderStatus === 'not_delivered') {
+        return {recon_status:'NOT_DELIVERED', priority:'P1', impact_amount:billed, verdict:'CONFIRMED', recommended_action:'暂缓并拒付', confidence:'HIGH', rationale:'订单尚未签收，不满足当前结算节点的付款条件。'};
+      }
+      if (billed === 0) {
+        return {recon_status:'NOT_BILLED', priority:'P3', impact_amount:sor, verdict:'REVIEW', recommended_action:'催承运商确认应付成本', confidence:'MEDIUM', rationale:'系统存在应计运费，但承运商账单金额为零。'};
+      }
+      if (billLines > 1) {
+        return {recon_status:'DUPLICATE', priority:'P1', impact_amount:Math.max(difference, billed / billLines), verdict:'CONFIRMED', recommended_action:'拒付重复部分', confidence:'HIGH', rationale:`同一订单出现 ${billLines} 条账单记录，需按订单及运单键核验重复计费。`};
+      }
+      const threshold = Math.max(Math.abs(sor) * 0.02, 0.01);
+      if (difference > threshold) {
+        return {recon_status:'OVERBILLED', priority:'P2', impact_amount:difference, verdict:'CONFIRMED', recommended_action:'追回应付差额', confidence:'HIGH', rationale:`账单金额高于系统应计 ${yuan.format(difference)}，超过 2% 容差。`};
+      }
+      if (difference < -threshold) {
+        return {recon_status:'UNDERBILLED', priority:'P2', impact_amount:difference, verdict:'REVIEW', recommended_action:'人工复核少计成本', confidence:'MEDIUM', rationale:`账单金额低于系统应计 ${yuan.format(Math.abs(difference))}，可能存在漏计或跨期。`};
+      }
+      return {recon_status:'MATCH', priority:'P3', impact_amount:difference, verdict:'PASS', recommended_action:'金额相符，留痕归档', confidence:'HIGH', rationale:'账单与系统应计差异处于 2% 容差范围内。'};
+    }
+
+    function createCustomCase(input) {
+      const rule = classifyCase(input);
+      const suffix = `${Date.now().toString().slice(-8)}-${crypto.randomUUID().slice(0, 4)}`;
+      return {
+        case_id:`SIM-${suffix}`,
+        custom:true,
+        created_at:new Date().toISOString(),
+        order_id:input.orderId,
+        seller_id:input.sellerId,
+        sor_freight:input.sor,
+        billed_total:input.billed,
+        policy_version:'browser-rule-v1',
+        case_state:'PENDING',
+        ...rule,
+        evidence:{
+          sor_freight:input.sor,
+          item_count:input.itemCount,
+          billed_total:input.billed,
+          bill_lines:input.billLines,
+          order_status:input.orderStatus,
+          customer_delivered_at:input.orderStatus === 'delivered' ? new Date().toISOString() : '未签收',
+          rationale:rule.rationale,
+          source:'user-simulated-input'
+        }
+      };
+    }
 
     async function postEvent(eventType, caseId, metadata={}) {
       if (!apiBase) return;
@@ -106,23 +225,25 @@
     }
 
     async function getCases() {
+      const customCases = loadCustomCases();
       if (apiBase) {
         try {
           const r = await fetch(apiBase + '/cases');
           if (!r.ok) throw Error(`HTTP ${r.status}`);
-          document.querySelector('#mode').textContent = '实时模式：读取本地 API；模型摘要按需生成，所有资金操作仍被禁用。';
-          return await r.json();
+          document.querySelector('#mode').textContent = '混合模式：读取本地 API，也可新建浏览器模拟案件；所有资金操作仍被禁用。';
+          return [...customCases, ...await r.json()];
         } catch (error) {
           document.querySelector('#mode').textContent = `API 不可用（${error.message}），已安全降级到脱敏演示数据。`;
+          apiBase = '';
         }
       }
       const r = await fetch(fallbackUrl);
-      if (!configuredApi) document.querySelector('#mode').textContent = '演示模式：使用仓库内脱敏样例；加 ?api=http://localhost:8000 可连本地 API。';
-      return await r.json();
+      if (!configuredApi) document.querySelector('#mode').textContent = '交互演示：可输入模拟数据并执行规则识别、人工复核与 JSON 留痕；数据仅保存在当前浏览器。';
+      return [...customCases, ...await r.json()];
     }
 
     function restoreDemoState(caseData) {
-      if (apiBase) return caseData;
+      if (usesApi(caseData)) return caseData;
       const saved = localStorage.getItem('settlement-' + caseData.case_id);
       if (!saved) return caseData;
       try {
@@ -140,7 +261,7 @@
     }
 
     async function enrich(caseData) {
-      if (!apiBase) return caseData;
+      if (!usesApi(caseData)) return caseData;
       try { const r = await fetch(apiBase + '/cases/' + encodeURIComponent(caseData.case_id)); return r.ok ? await r.json() : caseData; } catch (_) { return caseData; }
     }
 
@@ -152,6 +273,7 @@
       if (index >= 0) cases[index] = current;
       const e = current.evidence || {};
       const pending = (current.case_state || 'PENDING') === 'PENDING';
+      const savedDecision = getSavedDecision(current.case_id);
       document.querySelector('#detail').innerHTML = `
         <div class="case-title">
           <div><p class="eyebrow">Case ${esc(current.case_id)} · policy ${esc(current.policy_version || 'controlled-review-v2')}</p><h2>${esc(current.recon_status)} / ${esc(current.recommended_action)}</h2></div>
@@ -161,8 +283,8 @@
         <div class="grid">
           <section class="block"><h3>Evidence ledger</h3><dl>
             <dt>系统应计 SOR</dt><dd>${yuan.format(e.sor_freight ?? current.sor_freight ?? 0)}</dd>
-            <dt>费用明细</dt><dd>${esc(e.item_count ?? '—')} 条</dd>
-            <dt>承运商账单</dt><dd>${yuan.format(e.billed_total ?? current.billed_total ?? 0)} / ${esc(e.bill_lines ?? '—')} 条</dd>
+            <dt>费用明细</dt><dd>${esc(e.item_count ?? '未录入')} 条</dd>
+            <dt>承运商账单</dt><dd>${yuan.format(e.billed_total ?? current.billed_total ?? 0)} / ${esc(e.bill_lines ?? '未录入')} 条</dd>
             <dt>订单状态</dt><dd>${esc(e.order_status)}</dd>
             <dt>客户签收</dt><dd>${esc(e.customer_delivered_at)}</dd>
             <dt>规则依据</dt><dd>${esc(e.rationale || current.rationale)}</dd>
@@ -175,22 +297,24 @@
         <div class="model-panel" id="model-review" data-status="idle" role="status" aria-live="polite">
           <strong>AI 证据摘要尚未请求</strong>
           <p>点击后按需调用结构化模型；没有密钥或校验失败时会明确回退规则理由。</p>
-          <button class="action secondary" id="model-button" ${apiBase ? '' : 'disabled'}>生成结构化证据摘要</button>
+          <button class="action secondary" id="model-button" ${usesApi(current) ? '' : 'disabled'}>${usesApi(current) ? '生成结构化证据摘要' : '模拟案件使用规则证据摘要'}</button>
         </div>
         <div class="review-form">
           <label>审核人（必填）<input id="reviewer" maxlength="80" minlength="2" required aria-required="true" placeholder="至少 2 个字符" value="${esc(localStorage.getItem('settlement-reviewer') || '')}"></label>
           <label>案件状态<input value="${esc(current.case_state || 'PENDING')}" disabled></label>
-          <label>审核备注<textarea id="notes" maxlength="500" placeholder="记录采纳、驳回或升级原因"></textarea></label>
+          <label>审核备注<textarea id="notes" maxlength="500" placeholder="记录采纳、驳回或升级原因">${esc(savedDecision.notes || '')}</textarea></label>
         </div>
         <div class="actions">
           <button class="action" data-decision="APPROVED" ${pending ? '' : 'disabled'}>采纳建议</button>
           <button class="action secondary" data-decision="REJECTED" ${pending ? '' : 'disabled'}>驳回</button>
           <button class="action warn" data-decision="ESCALATED" ${pending ? '' : 'disabled'}>升级主管复核</button>
+          <button class="action secondary" id="export-case" type="button">导出案件与复核轨迹 JSON</button>
         </div>
         <div class="status" id="status" role="status" aria-live="polite">${pending ? '' : `该案件已记录决定：${esc(current.case_state)}`}</div>`;
       document.querySelectorAll('[data-decision]').forEach(button => button.onclick = () => decide(button.dataset.decision));
       document.querySelector('#model-button').onclick = requestModelReview;
-      postEvent('CASE_OPENED', current.case_id, {mode:apiBase?'api':'demo'});
+      document.querySelector('#export-case').onclick = exportCurrentCase;
+      if (usesApi(current)) postEvent('CASE_OPENED', current.case_id, {mode:'api'});
     }
 
     function renderModelReview(result) {
@@ -204,7 +328,7 @@
     }
 
     async function requestModelReview() {
-      if (!apiBase) return;
+      if (!usesApi(selected)) return;
       const panel = document.querySelector('#model-review');
       panel.dataset.status = 'loading';
       panel.innerHTML = '<strong>正在生成并校验证据摘要…</strong>';
@@ -233,7 +357,7 @@
       const status = document.querySelector('#status');
       if (reviewer.length < 2) { status.textContent = '请填写至少 2 个字符的审核人姓名或工号。'; return; }
       localStorage.setItem('settlement-reviewer', reviewer);
-      if (apiBase) {
+      if (usesApi(selected)) {
         const keyName = `decision-request-${selected.case_id}`;
         const idempotencyKey = localStorage.getItem(keyName) || newId('decision');
         localStorage.setItem(keyName, idempotencyKey);
@@ -258,10 +382,90 @@
       }
       localStorage.setItem('settlement-' + selected.case_id, JSON.stringify({decision,reviewer,notes}));
       selected.case_state = decision;
+      if (selected.custom) saveCustomCases();
       renderQueue();
       await renderDetail();
       document.querySelector('#status').textContent = `演示记录：${decision}。真实模式将写入不可覆盖的人工审批审计记录；系统不会执行资金操作。`;
     }
+
+    function exportCurrentCase() {
+      if (!selected) return;
+      const payload = {
+        export_type:'settlement_reconciliation_audit_trail',
+        exported_at:new Date().toISOString(),
+        environment:selected.custom ? 'browser_simulation' : (usesApi(selected) ? 'local_api' : 'public_demo'),
+        case:selected,
+        human_review:getSavedDecision(selected.case_id),
+        controls:{
+          rule_engine_is_source_of_truth:true,
+          human_approval_required:true,
+          financial_execution_enabled:false
+        },
+        disclaimer:'仅用于作品集演示，不包含真实业务数据，不会触发付款或追款。'
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${selected.case_id}-audit-trail.json`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const status = document.querySelector('#status');
+      if (status) status.textContent = '案件与人工复核轨迹 JSON 已生成；文件保存在浏览器下载目录。';
+    }
+
+    document.querySelector('#case-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const formStatus = document.querySelector('#form-status');
+      const input = {
+        orderId:document.querySelector('#order-input').value.trim(),
+        sellerId:document.querySelector('#seller-input').value.trim(),
+        orderStatus:document.querySelector('#order-status-input').value,
+        sor:Number(document.querySelector('#sor-input').value),
+        billed:Number(document.querySelector('#billed-input').value),
+        billLines:Number(document.querySelector('#lines-input').value),
+        itemCount:Number(document.querySelector('#items-input').value)
+      };
+      if (!input.orderId || !input.sellerId) {
+        formStatus.textContent = '请填写订单号和卖家编号。';
+        return;
+      }
+      if (![input.sor,input.billed,input.billLines,input.itemCount].every(Number.isFinite) || input.sor < 0 || input.billed < 0 || input.billLines < 0 || input.itemCount < 0) {
+        formStatus.textContent = '金额和行数必须是大于或等于零的有效数字。';
+        return;
+      }
+      const created = createCustomCase(input);
+      cases.unshift(created);
+      selected = created;
+      filter = 'ALL';
+      document.querySelectorAll('.filter').forEach(button => {
+        const active = button.dataset.filter === 'ALL';
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+      saveCustomCases();
+      renderQueue();
+      await renderDetail();
+      formStatus.textContent = `已生成 ${created.recon_status} 案件，并按 ${created.priority} 优先级进入队列。`;
+      document.querySelector('#case-builder').open = false;
+    });
+
+    document.querySelector('#clear-custom').addEventListener('click', async () => {
+      const customIds = cases.filter(item => item.custom).map(item => item.case_id);
+      customIds.forEach(id => localStorage.removeItem('settlement-' + id));
+      cases = cases.filter(item => !item.custom);
+      localStorage.removeItem(CUSTOM_CASES_KEY);
+      filter = 'ALL';
+      document.querySelectorAll('.filter').forEach(button => {
+        const active = button.dataset.filter === 'ALL';
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+      selected = cases[0] || null;
+      document.querySelector('#form-status').textContent = '已清空当前浏览器中的自建案件。';
+      renderQueue();
+      if (selected) await renderDetail();
+    });
 
     document.querySelectorAll('.filter').forEach(button => button.onclick = () => {
       filter=button.dataset.filter;
