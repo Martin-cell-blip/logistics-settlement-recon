@@ -26,7 +26,7 @@ SQL = ROOT / "sql"
 OUT = ROOT / "output"
 OUT.mkdir(parents=True, exist_ok=True)
 
-POLICY_VERSION = "controlled-review-v2"
+POLICY_VERSION = "controlled-review-v3"
 RULE_FILES = ("02_three_way_match.sql", "03_ar_aging.sql")
 
 TRUTH_LABELS = {
@@ -63,6 +63,10 @@ def load_base_tables(con: duckdb.DuckDBPyConnection) -> None:
             SELECT * FROM read_csv_auto('{p(RAW / "olist_orders_dataset.csv")}');
         CREATE OR REPLACE TABLE carrier_bill AS
             SELECT * FROM read_csv_auto('{p(GEN / "carrier_bill.csv")}');
+        CREATE OR REPLACE TABLE contract_expectations AS
+            SELECT * FROM read_csv_auto('{p(GEN / "contract_expectations.csv")}');
+        CREATE OR REPLACE TABLE contract_rate_card AS
+            SELECT * FROM read_csv_auto('{p(GEN / "contract_rate_card.csv")}');
         CREATE OR REPLACE TABLE ar_invoices AS
             SELECT * FROM read_csv_auto('{p(GEN / "ar_invoices.csv")}');
         CREATE OR REPLACE TABLE rate_card AS
@@ -178,15 +182,9 @@ def validate_recon(con: duckdb.DuckDBPyConnection) -> dict:
     truth_drop = con.execute(
         """
         SELECT s.order_id, s.seller_id, 'DROP_NOT_BILLED' AS injected
-        FROM (
-            SELECT oi.order_id, oi.seller_id,
-                   (ANY_VALUE(o.order_status)='delivered'
-                    AND ANY_VALUE(o.order_delivered_customer_date) IS NOT NULL) AS deliv
-            FROM raw_order_items oi LEFT JOIN raw_orders o USING(order_id)
-            GROUP BY oi.order_id, oi.seller_id
-        ) s
+        FROM contract_service s
         LEFT JOIN carrier_bill b USING(order_id, seller_id)
-        WHERE b.order_id IS NULL AND s.deliv
+        WHERE b.order_id IS NULL AND s.is_delivered
         """
     ).fetchdf()
     truth = pd.concat([truth_bill, truth_drop], ignore_index=True)
@@ -234,6 +232,8 @@ def write_run_manifest(
         RAW / "olist_order_items_dataset.csv",
         RAW / "olist_orders_dataset.csv",
         GEN / "carrier_bill.csv",
+        GEN / "contract_expectations.csv",
+        GEN / "contract_rate_card.csv",
         GEN / "ar_invoices.csv",
         GEN / "rate_card.csv",
         GEN / "ecl_matrix.csv",
@@ -244,6 +244,8 @@ def write_run_manifest(
             "raw_order_items",
             "raw_orders",
             "carrier_bill",
+            "contract_expectations",
+            "contract_rate_card",
             "ar_invoices",
             *exported_tables,
         ]

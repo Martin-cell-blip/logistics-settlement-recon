@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="物流结算异常识别、证据回溯与人工复核的公开脱敏演示。">
-  <title>物流结算异常复核｜公开脱敏演示</title>
+  <meta name="description" content="可输入模拟数据的物流结算异常识别、合同证据回溯与人工复核演示。">
+  <title>物流结算异常复核｜交互演示</title>
   <style>
     :root { --ink:#102522; --muted:#536663; --paper:#f4f7f6; --line:#cbd8d5; --panel:#ffffff; --teal:#08695d; --mint:#d7e9e4; --orange:#c95d32; --red:#a92f28; --gold:#edbd43; }
     * { box-sizing:border-box; }
@@ -39,6 +39,9 @@
     .builder-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 13px 14px; border-top:1px solid var(--line); }
     .builder-form label { display:grid; gap:5px; padding-top:12px; color:var(--muted); font-size:12px; }
     .builder-form .wide { grid-column:1/-1; }
+    .builder-presets { display:flex; flex-wrap:wrap; gap:7px; grid-column:1/-1; padding-top:12px; }
+    .builder-presets button { min-height:36px; padding:6px 9px; border:1px solid var(--line); color:var(--teal); background:#fff; }
+    .builder-presets button:hover { border-color:var(--teal); }
     .builder-actions { display:flex; flex-wrap:wrap; gap:8px; grid-column:1/-1; padding-top:2px; }
     .form-status { grid-column:1/-1; min-height:18px; color:var(--red); font-size:12px; }
     article { padding:30px clamp(22px,4vw,68px) 54px; max-width:1100px; }
@@ -77,7 +80,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div><p class="context-line">公开脱敏演示 · 规则裁定 · 人工决定 · 资金执行禁用</p><h1>物流结算异常复核台</h1></div>
+    <div><p class="context-line">模拟数据输入 · 合同规则裁定 · 人工决定 · 资金执行禁用</p><h1>物流结算异常复核台</h1></div>
     <div class="top-actions">
       <div class="mode" id="mode" role="status" aria-live="polite">加载中：将优先尝试本地 API；无 API 时展示仓库内演示案件。</div>
       <nav class="top-links" aria-label="项目链接">
@@ -88,9 +91,15 @@
   </header>
   <main>
     <aside>
-      <details class="case-builder" id="case-builder">
-        <summary>新建模拟对账案件</summary>
+      <details class="case-builder" id="case-builder" open>
+        <summary>输入模拟数据并运行核验</summary>
         <form class="builder-form" id="case-form">
+          <div class="builder-presets" aria-label="异常案例预设">
+            <button type="button" data-case-preset="overbilled">多计费</button>
+            <button type="button" data-case-preset="duplicate">重复计费</button>
+            <button type="button" data-case-preset="notDelivered">未签收</button>
+            <button type="button" data-case-preset="match">金额一致</button>
+          </div>
           <label class="wide">订单号
             <input id="order-input" required maxlength="40" value="ORDER-SIM-001" placeholder="例如 ORDER-SIM-001">
           </label>
@@ -104,8 +113,18 @@
               <option value="missing_order">订单缺失</option>
             </select>
           </label>
-          <label>系统应计金额
-            <input id="sor-input" required type="number" min="0" step="0.01" value="100">
+          <label>服务区域
+            <select id="zone-input">
+              <option value="Z1">Z1 · 同城</option>
+              <option value="Z2" selected>Z2 · 省内</option>
+              <option value="Z3">Z3 · 跨省</option>
+            </select>
+          </label>
+          <label>计费重量
+            <input id="weight-input" required type="number" min="0.1" step="0.1" value="5">
+          </label>
+          <label>合同应付金额
+            <input id="contract-input" required type="number" min="0" step="0.01" value="100">
           </label>
           <label>承运商账单金额
             <input id="billed-input" required type="number" min="0" step="0.01" value="125">
@@ -116,8 +135,14 @@
           <label>费用明细数
             <input id="items-input" required type="number" min="0" max="99" step="1" value="1">
           </label>
+          <label>费率卡版本
+            <input id="rate-version-input" required maxlength="40" value="RATE-CARD-2026-Q2">
+          </label>
+          <label>合同条款
+            <input id="clause-input" required maxlength="80" value="§4.2 按计费重量与服务区域结算">
+          </label>
           <div class="builder-actions">
-            <button class="action" type="submit">生成异常案件</button>
+            <button class="action" type="submit">运行三方核验</button>
             <button class="action secondary" id="clear-custom" type="button">清空自建案件</button>
           </div>
           <div class="form-status" id="form-status" role="status" aria-live="polite"></div>
@@ -132,7 +157,7 @@
   <script>
     const fallbackUrl = './demo_cases.json';
     const configuredApi = new URLSearchParams(location.search).get('api');
-    const CUSTOM_CASES_KEY = 'settlement-custom-cases-v1';
+    const CUSTOM_CASES_KEY = 'settlement-custom-cases-v2';
     let cases = [], selected = null, filter = 'ALL', apiBase = configuredApi || '';
     const sessionId = localStorage.getItem('settlement-session') || `session-${crypto.randomUUID()}`;
     localStorage.setItem('settlement-session', sessionId);
@@ -162,8 +187,8 @@
       }
     }
 
-    function classifyCase({sor, billed, billLines, orderStatus}) {
-      const difference = Number((billed - sor).toFixed(2));
+    function classifyCase({contractExpected, billed, billLines, orderStatus}) {
+      const difference = Number((billed - contractExpected).toFixed(2));
       if (orderStatus === 'missing_order') {
         return {recon_status:'MISSING_ORDER', priority:'P1', impact_amount:billed, verdict:'CONFIRMED', recommended_action:'拒付整笔账单', confidence:'HIGH', rationale:'承运商账单存在，但订单主数据缺失，无法建立有效结算依据。'};
       }
@@ -171,19 +196,19 @@
         return {recon_status:'NOT_DELIVERED', priority:'P1', impact_amount:billed, verdict:'CONFIRMED', recommended_action:'暂缓并拒付', confidence:'HIGH', rationale:'订单尚未签收，不满足当前结算节点的付款条件。'};
       }
       if (billed === 0) {
-        return {recon_status:'NOT_BILLED', priority:'P3', impact_amount:sor, verdict:'REVIEW', recommended_action:'催承运商确认应付成本', confidence:'MEDIUM', rationale:'系统存在应计运费，但承运商账单金额为零。'};
+        return {recon_status:'NOT_BILLED', priority:'P3', impact_amount:contractExpected, verdict:'REVIEW', recommended_action:'催承运商确认应付成本', confidence:'MEDIUM', rationale:'合同规则存在应付金额，但承运商账单金额为零。'};
       }
       if (billLines > 1) {
         return {recon_status:'DUPLICATE', priority:'P1', impact_amount:Math.max(difference, billed / billLines), verdict:'CONFIRMED', recommended_action:'拒付重复部分', confidence:'HIGH', rationale:`同一订单出现 ${billLines} 条账单记录，需按订单及运单键核验重复计费。`};
       }
-      const threshold = Math.max(Math.abs(sor) * 0.02, 0.01);
+      const threshold = Math.max(Math.abs(contractExpected) * 0.02, 0.01);
       if (difference > threshold) {
-        return {recon_status:'OVERBILLED', priority:'P2', impact_amount:difference, verdict:'CONFIRMED', recommended_action:'追回应付差额', confidence:'HIGH', rationale:`账单金额高于系统应计 ${yuan.format(difference)}，超过 2% 容差。`};
+        return {recon_status:'OVERBILLED', priority:'P2', impact_amount:difference, verdict:'CONFIRMED', recommended_action:'拒付并追回多计差额', confidence:'HIGH', rationale:`账单金额高于合同应付 ${yuan.format(difference)}，超过 2% 容差。`};
       }
       if (difference < -threshold) {
-        return {recon_status:'UNDERBILLED', priority:'P2', impact_amount:difference, verdict:'REVIEW', recommended_action:'人工复核少计成本', confidence:'MEDIUM', rationale:`账单金额低于系统应计 ${yuan.format(Math.abs(difference))}，可能存在漏计或跨期。`};
+        return {recon_status:'UNDERBILLED', priority:'P2', impact_amount:difference, verdict:'REVIEW', recommended_action:'人工复核少计成本', confidence:'MEDIUM', rationale:`账单金额低于合同应付 ${yuan.format(Math.abs(difference))}，可能存在漏计或跨期。`};
       }
-      return {recon_status:'MATCH', priority:'P3', impact_amount:difference, verdict:'PASS', recommended_action:'金额相符，留痕归档', confidence:'HIGH', rationale:'账单与系统应计差异处于 2% 容差范围内。'};
+      return {recon_status:'MATCH', priority:'P3', impact_amount:difference, verdict:'PASS', recommended_action:'金额相符，留痕归档', confidence:'HIGH', rationale:'承运商账单与合同应付差异处于 2% 容差范围内。'};
     }
 
     function createCustomCase(input) {
@@ -195,20 +220,26 @@
         created_at:new Date().toISOString(),
         order_id:input.orderId,
         seller_id:input.sellerId,
-        sor_freight:input.sor,
+        sor_freight:input.contractExpected,
+        contract_expected:input.contractExpected,
         billed_total:input.billed,
-        policy_version:'browser-rule-v1',
+        policy_version:'browser-contract-rule-v3',
         case_state:'PENDING',
         ...rule,
         evidence:{
-          sor_freight:input.sor,
+          sor_freight:input.contractExpected,
+          contract_expected:input.contractExpected,
+          rate_card_version:input.rateVersion,
+          contract_clause:input.contractClause,
+          service_zone:input.serviceZone,
+          chargeable_weight_kg:input.chargeableWeight,
           item_count:input.itemCount,
           billed_total:input.billed,
           bill_lines:input.billLines,
           order_status:input.orderStatus,
           customer_delivered_at:input.orderStatus === 'delivered' ? new Date().toISOString() : '未签收',
           rationale:rule.rationale,
-          source:'user-simulated-input'
+          source:'user-simulated-contract-input'
         }
       };
     }
@@ -276,13 +307,16 @@
       const savedDecision = getSavedDecision(current.case_id);
       document.querySelector('#detail').innerHTML = `
         <div class="case-title">
-          <div><p class="eyebrow">Case ${esc(current.case_id)} · policy ${esc(current.policy_version || 'controlled-review-v2')}</p><h2>${esc(current.recon_status)} / ${esc(current.recommended_action)}</h2></div>
+          <div><p class="eyebrow">Case ${esc(current.case_id)} · policy ${esc(current.policy_version || 'controlled-review-v3')}</p><h2>${esc(current.recon_status)} / ${esc(current.recommended_action)}</h2></div>
           <div class="money">${yuan.format(Math.abs(current.impact_amount||0))}</div>
         </div>
         <p class="tagline">订单 ${esc(current.order_id)}　·　卖家 ${esc(current.seller_id)}　·　规则置信度 ${esc(current.confidence)}　·　状态 ${esc(current.case_state || 'PENDING')}</p>
         <div class="grid">
           <section class="block"><h3>Evidence ledger</h3><dl>
-            <dt>系统应计 SOR</dt><dd>${yuan.format(e.sor_freight ?? current.sor_freight ?? 0)}</dd>
+             <dt>合同应付金额</dt><dd>${yuan.format(e.contract_expected ?? e.sor_freight ?? current.sor_freight ?? 0)}</dd>
+             <dt>费率卡版本</dt><dd>${esc(e.rate_card_version ?? '演示数据未录入')}</dd>
+             <dt>合同条款</dt><dd>${esc(e.contract_clause ?? '演示数据未录入')}</dd>
+             <dt>服务区域 / 计费重</dt><dd>${esc(e.service_zone ?? '未录入')} / ${esc(e.chargeable_weight_kg ?? '未录入')} kg</dd>
             <dt>费用明细</dt><dd>${esc(e.item_count ?? '未录入')} 条</dd>
             <dt>承运商账单</dt><dd>${yuan.format(e.billed_total ?? current.billed_total ?? 0)} / ${esc(e.bill_lines ?? '未录入')} 条</dd>
             <dt>订单状态</dt><dd>${esc(e.order_status)}</dd>
@@ -414,6 +448,28 @@
       if (status) status.textContent = '案件与人工复核轨迹 JSON 已生成；文件保存在浏览器下载目录。';
     }
 
+    function applyCasePreset(name) {
+      const presets = {
+        overbilled:{status:'delivered',contractExpected:100,billed:125,billLines:1,zone:'Z2',weight:5},
+        duplicate:{status:'delivered',contractExpected:100,billed:200,billLines:2,zone:'Z2',weight:5},
+        notDelivered:{status:'not_delivered',contractExpected:100,billed:100,billLines:1,zone:'Z3',weight:8},
+        match:{status:'delivered',contractExpected:100,billed:100,billLines:1,zone:'Z1',weight:2}
+      };
+      const preset = presets[name];
+      if (!preset) return;
+      document.querySelector('#order-status-input').value = preset.status;
+      document.querySelector('#contract-input').value = preset.contractExpected;
+      document.querySelector('#billed-input').value = preset.billed;
+      document.querySelector('#lines-input').value = preset.billLines;
+      document.querySelector('#zone-input').value = preset.zone;
+      document.querySelector('#weight-input').value = preset.weight;
+      document.querySelector('#form-status').textContent = '预设已填入，可继续修改后运行三方核验。';
+    }
+
+    document.querySelectorAll('[data-case-preset]').forEach(button => {
+      button.addEventListener('click', () => applyCasePreset(button.dataset.casePreset));
+    });
+
     document.querySelector('#case-form').addEventListener('submit', async event => {
       event.preventDefault();
       const formStatus = document.querySelector('#form-status');
@@ -421,17 +477,21 @@
         orderId:document.querySelector('#order-input').value.trim(),
         sellerId:document.querySelector('#seller-input').value.trim(),
         orderStatus:document.querySelector('#order-status-input').value,
-        sor:Number(document.querySelector('#sor-input').value),
+        serviceZone:document.querySelector('#zone-input').value,
+        chargeableWeight:Number(document.querySelector('#weight-input').value),
+        contractExpected:Number(document.querySelector('#contract-input').value),
         billed:Number(document.querySelector('#billed-input').value),
         billLines:Number(document.querySelector('#lines-input').value),
-        itemCount:Number(document.querySelector('#items-input').value)
+        itemCount:Number(document.querySelector('#items-input').value),
+        rateVersion:document.querySelector('#rate-version-input').value.trim(),
+        contractClause:document.querySelector('#clause-input').value.trim()
       };
-      if (!input.orderId || !input.sellerId) {
-        formStatus.textContent = '请填写订单号和卖家编号。';
+      if (!input.orderId || !input.sellerId || !input.rateVersion || !input.contractClause) {
+        formStatus.textContent = '请填写订单、卖家、费率卡版本和合同条款。';
         return;
       }
-      if (![input.sor,input.billed,input.billLines,input.itemCount].every(Number.isFinite) || input.sor < 0 || input.billed < 0 || input.billLines < 0 || input.itemCount < 0) {
-        formStatus.textContent = '金额和行数必须是大于或等于零的有效数字。';
+      if (![input.contractExpected,input.billed,input.billLines,input.itemCount,input.chargeableWeight].every(Number.isFinite) || input.contractExpected < 0 || input.billed < 0 || input.billLines < 0 || input.itemCount < 0 || input.chargeableWeight <= 0) {
+        formStatus.textContent = '金额、行数和计费重量必须是有效数字；计费重量需大于零。';
         return;
       }
       const created = createCustomCase(input);
@@ -446,7 +506,7 @@
       saveCustomCases();
       renderQueue();
       await renderDetail();
-      formStatus.textContent = `已生成 ${created.recon_status} 案件，并按 ${created.priority} 优先级进入队列。`;
+      formStatus.textContent = `核验完成：${created.recon_status}，已按 ${created.priority} 优先级进入复核队列。`;
       document.querySelector('#case-builder').open = false;
     });
 

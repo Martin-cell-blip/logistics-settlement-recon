@@ -189,6 +189,41 @@ def test_evidence_bundle_contains_sources_decisions_events_and_lineage(
     body = response.json()
     assert body["bundle_version"] == "audit-evidence-v1"
     assert body["source_evidence"]["items"][0]["freight_value"] == 100.0
-    assert body["human_decision"]["reviewer"] == "测试审核人"
+    assert body["human_decision"]["reviewer"] == "demo-reviewer"
     assert body["event_timeline"][0]["event_type"] == "DECISION_SUBMITTED"
     assert body["financial_execution"] == "disabled"
+
+
+def test_api_key_roles_are_enforced(client, monkeypatch):
+    monkeypatch.setenv(
+        "REVIEW_API_KEYS",
+        '{"viewer-key":{"actor_id":"viewer-1","role":"viewer"},'
+        '"reviewer-key":{"actor_id":"reviewer-1","role":"reviewer"}}',
+    )
+    missing = client.get("/cases")
+    allowed = client.get("/cases", headers={"X-API-Key": "viewer-key"})
+    forbidden = client.post(
+        "/cases/REC-000001/human-decision",
+        headers={"X-API-Key": "viewer-key"},
+        json={
+            "decision": "APPROVED",
+            "notes": "只读角色不得提交",
+            "idempotency_key": "role-check-0001",
+            "expected_state": "PENDING",
+        },
+    )
+    reviewer = client.post(
+        "/cases/REC-000001/human-decision",
+        headers={"X-API-Key": "reviewer-key"},
+        json={
+            "decision": "APPROVED",
+            "notes": "证据已复核",
+            "idempotency_key": "role-check-0002",
+            "expected_state": "PENDING",
+        },
+    )
+    assert missing.status_code == 401
+    assert allowed.status_code == 200
+    assert forbidden.status_code == 403
+    assert reviewer.status_code == 200
+    assert reviewer.json()["decision"]["reviewer"] == "reviewer-1"

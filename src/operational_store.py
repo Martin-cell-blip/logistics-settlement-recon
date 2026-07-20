@@ -31,8 +31,19 @@ class OperationalStore:
 
     def _initialize(self) -> None:
         with self._lock, self._connect() as con:
-            con.executescript(
-                """
+            con.execute(
+                """CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    applied_at TEXT NOT NULL
+                )"""
+            )
+            applied = {
+                row["version"]
+                for row in con.execute("SELECT version FROM schema_migrations").fetchall()
+            }
+            if 1 not in applied:
+                con.executescript(
+                    """
                 CREATE TABLE IF NOT EXISTS human_decisions (
                     id INTEGER PRIMARY KEY,
                     case_id TEXT NOT NULL UNIQUE,
@@ -58,7 +69,22 @@ class OperationalStore:
                 CREATE INDEX IF NOT EXISTS idx_events_case
                     ON product_events(case_id, recorded_at);
                 """
-            )
+                )
+                con.execute(
+                    "INSERT INTO schema_migrations VALUES (?,?)", (1, utc_now())
+                )
+            if 2 not in applied:
+                columns = {
+                    row["name"]
+                    for row in con.execute("PRAGMA table_info(human_decisions)").fetchall()
+                }
+                if "actor_role" not in columns:
+                    con.execute(
+                        "ALTER TABLE human_decisions ADD COLUMN actor_role TEXT NOT NULL DEFAULT 'reviewer'"
+                    )
+                con.execute(
+                    "INSERT INTO schema_migrations VALUES (?,?)", (2, utc_now())
+                )
 
     @staticmethod
     def _record(row: sqlite3.Row | None) -> dict | None:

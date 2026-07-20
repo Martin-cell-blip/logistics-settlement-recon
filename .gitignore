@@ -4,6 +4,7 @@ data/generated/*.csv
 output/*.csv
 output/*.xlsx
 output/*.md
+output/*.json
 
 # Python
 __pycache__/

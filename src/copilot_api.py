@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Literal
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -27,10 +27,12 @@ try:  # Supports both `uvicorn src.copilot_api:app` and direct execution.
     from .audit_agent import connect, review, trace
     from .model_review import PROMPT_VERSION, generate_model_review
     from .operational_store import DecisionConflict, OperationalStore
+    from .security import Actor, auth_mode, require_roles
 except ImportError:  # pragma: no cover
     from audit_agent import connect, review, trace
     from model_review import PROMPT_VERSION, generate_model_review
     from operational_store import DecisionConflict, OperationalStore
+    from security import Actor, auth_mode, require_roles
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "output"
@@ -67,7 +69,7 @@ app.add_middleware(
 
 class HumanDecision(BaseModel):
     decision: Literal["APPROVED", "REJECTED", "ESCALATED"]
-    reviewer: str = Field(min_length=2, max_length=80)
+    reviewer: str | None = Field(default=None, min_length=2, max_length=80)
     notes: str = Field(default="", max_length=500)
     idempotency_key: str = Field(min_length=8, max_length=100)
     expected_state: Literal["PENDING"] = "PENDING"
@@ -161,11 +163,16 @@ def health() -> dict:
             "available" if os.environ.get("ANTHROPIC_API_KEY") else "disabled"
         ),
         "prompt_version": PROMPT_VERSION,
+        "authentication": auth_mode(),
     }
 
 
 @app.get("/cases")
-def cases(priority: str | None = None, limit: int = 50) -> list[dict]:
+def cases(
+    priority: str | None = None,
+    limit: int = 50,
+    actor: Actor = Depends(require_roles("viewer", "reviewer", "admin")),
+) -> list[dict]:
     reviews = _load_reviews()
     if priority:
         reviews = reviews[reviews["priority"] == priority]
@@ -181,7 +188,10 @@ def cases(priority: str | None = None, limit: int = 50) -> list[dict]:
 
 
 @app.get("/cases/{case_id}")
-def case_detail(case_id: str) -> dict:
+def case_detail(
+    case_id: str,
+    actor: Actor = Depends(require_roles("viewer", "reviewer", "admin")),
+) -> dict:
     item, evidence, (_, _, _, current_rationale) = _case_with_evidence(case_id)
     latest = _latest_decision(case_id)
     item["case_state"] = (
@@ -190,6 +200,8 @@ def case_detail(case_id: str) -> dict:
     item["latest_decision"] = latest
     item["evidence"] = {
         "sor_freight": evidence["sor_freight"],
+        "contract_expected_freight": evidence.get("contract_expected_freight"),
+        "contract": evidence.get("contract"),
         "item_count": evidence["n_items"],
         "billed_total": evidence["billed_total"],
         "bill_lines": evidence["n_bill_lines"],
@@ -230,7 +242,10 @@ def _json_record(record: dict | None) -> dict | None:
 
 
 @app.get("/cases/{case_id}/evidence-bundle")
-def evidence_bundle(case_id: str):
+def evidence_bundle(
+    case_id: str,
+    actor: Actor = Depends(require_roles("viewer", "reviewer", "admin")),
+):
     item, evidence, rule_result = _case_with_evidence(case_id)
     verdict, action, confidence, rationale = rule_result
     bundle = {
@@ -239,6 +254,8 @@ def evidence_bundle(case_id: str):
         "case": item,
         "source_evidence": {
             "sor_freight": evidence["sor_freight"],
+            "contract_expected_freight": evidence.get("contract_expected_freight"),
+            "contract": evidence.get("contract"),
             "item_count": evidence["n_items"],
             "items": _dataframe_records(evidence["items"]),
             "order": _json_record(evidence["order"]),
@@ -251,7 +268,7 @@ def evidence_bundle(case_id: str):
             "recommended_action": action,
             "confidence": confidence,
             "rationale": rationale,
-            "policy_version": item.get("policy_version", "controlled-review-v2"),
+            "policy_version": item.get("policy_version", "controlled-review-v3"),
         },
         "human_decision": _latest_decision(case_id),
         "event_timeline": STORE.case_events(case_id),
@@ -279,7 +296,11 @@ def evidence_bundle(case_id: str):
 
 
 @app.post("/cases/{case_id}/model-review")
-def model_review(case_id: str, payload: ModelReviewRequest) -> dict:
+def model_review(
+    case_id: str,
+    payload: ModelReviewRequest,
+    actor: Actor = Depends(require_roles("reviewer", "admin")),
+) -> dict:
     with MODEL_CACHE_LOCK:
         cached = MODEL_CACHE.get(payload.request_id)
     if cached is not None:
@@ -333,19 +354,24 @@ def model_review(case_id: str, payload: ModelReviewRequest) -> dict:
 
 
 @app.post("/cases/{case_id}/human-decision")
-def human_decision(case_id: str, payload: HumanDecision) -> dict:
+def human_decision(
+    case_id: str,
+    payload: HumanDecision,
+    actor: Actor = Depends(require_roles("reviewer", "admin")),
+) -> dict:
     row = _case_row(case_id)
     if payload.expected_state != "PENDING":
         raise HTTPException(status_code=409, detail="案件状态已变化，请刷新后重试")
     decision = {
         "case_id": case_id,
         "recorded_at": datetime.now(timezone.utc).isoformat(),
-        "reviewer": payload.reviewer,
+        "reviewer": actor.actor_id,
+        "actor_role": actor.role,
         "human_decision": payload.decision,
         "notes": payload.notes,
         "recommended_action": row["recommended_action"],
         "impact_amount": float(row["impact_amount"]),
-        "policy_version": row.get("policy_version", "controlled-review-v2"),
+        "policy_version": row.get("policy_version", "controlled-review-v3"),
         "idempotency_key": payload.idempotency_key,
         "previous_state": "PENDING",
         "new_state": payload.decision,
@@ -369,7 +395,10 @@ def human_decision(case_id: str, payload: HumanDecision) -> dict:
 
 
 @app.post("/events")
-def record_event(payload: ProductEvent) -> dict:
+def record_event(
+    payload: ProductEvent,
+    actor: Actor = Depends(require_roles("reviewer", "admin")),
+) -> dict:
     if payload.case_id:
         _case_row(payload.case_id)
     STORE.append_event(_event_record(payload))
@@ -377,7 +406,9 @@ def record_event(payload: ProductEvent) -> dict:
 
 
 @app.get("/metrics/summary")
-def metrics_summary() -> dict:
+def metrics_summary(
+    actor: Actor = Depends(require_roles("viewer", "reviewer", "admin")),
+) -> dict:
     store_metrics = STORE.metrics()
     decision_counts = store_metrics["decision_counts"]
     total_decisions = store_metrics["total_decisions"]
