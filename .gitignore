@@ -11,6 +11,7 @@ __pycache__/
 .venv/
 venv/
 *.duckdb
+*.sqlite3
 
 # 保留空目录
 !data/raw/.gitkeep
