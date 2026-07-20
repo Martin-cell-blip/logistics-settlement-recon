@@ -3,18 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Settlement Review Copilot</title>
+  <meta name="description" content="物流结算异常识别、证据回溯与人工复核的公开脱敏演示。">
+  <title>物流结算异常复核｜公开脱敏演示</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700;900&display=swap');
-    :root { --ink:#14211f; --muted:#56635f; --paper:#f5f1e7; --line:#c9c3b5; --panel:#fffcf4; --teal:#0e6157; --mint:#c8e0d7; --orange:#dc6334; --red:#a62c22; --gold:#e6b84a; }
+    :root { --ink:#102522; --muted:#536663; --paper:#f4f7f6; --line:#cbd8d5; --panel:#ffffff; --teal:#08695d; --mint:#d7e9e4; --orange:#c95d32; --red:#a92f28; --gold:#edbd43; }
     * { box-sizing:border-box; }
-    body { margin:0; color:var(--ink); background:var(--paper); font:14px/1.55 "IBM Plex Mono", "Noto Sans Mono CJK SC", monospace; }
-    .topbar { min-height:116px; display:flex; justify-content:space-between; align-items:flex-end; gap:22px; padding:27px 4.5vw 23px; color:#f7f2e6; background:var(--ink); border-bottom:6px solid var(--gold); }
-    .eyebrow { margin:0 0 5px; color:#a6d3c8; font-size:11px; letter-spacing:.14em; text-transform:uppercase; }
-    h1 { margin:0; font:900 clamp(28px,4vw,50px)/.98 "Noto Serif SC", serif; letter-spacing:-.035em; text-wrap:balance; }
-    .mode { max-width:395px; padding:9px 11px; border:1px solid #55736c; color:#d7e7dd; font-size:12px; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:14px/1.55 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; }
+    .topbar { min-height:116px; display:flex; justify-content:space-between; align-items:flex-end; gap:22px; padding:27px 4.5vw 23px; color:#f8fbfa; background:var(--ink); border-bottom:5px solid var(--gold); }
+    .context-line { margin:0 0 5px; color:#a6d3c8; font-size:12px; }
+    h1 { margin:0; font:800 clamp(28px,4vw,48px)/1.02 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; letter-spacing:-.03em; text-wrap:balance; }
+    .top-actions { display:grid; justify-items:end; gap:9px; max-width:450px; }
+    .mode { padding:9px 11px; border:1px solid #55736c; color:#d7e7dd; font-size:12px; }
+    .top-links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:14px; }
+    .top-links a { color:#fff; font-size:12px; font-weight:650; text-underline-offset:4px; }
     main { display:grid; grid-template-columns:minmax(280px, .83fr) minmax(500px, 1.7fr); min-height:calc(100vh - 122px); }
-    aside { border-right:1px solid var(--line); padding:26px 20px; background:#ece7d9; }
+    aside { border-right:1px solid var(--line); padding:26px 20px; background:#e8efed; }
     .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:12px; margin-bottom:18px; }
     .filters { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px; }
     button { min-height:44px; font:inherit; cursor:pointer; }
@@ -23,14 +26,14 @@
     .filter.active { color:#fff; background:var(--teal); border-color:var(--teal); }
     .case { width:100%; text-align:left; padding:15px 12px; border:1px solid var(--line); border-bottom:none; background:var(--panel); transition:.18s ease; }
     .case:last-child { border-bottom:1px solid var(--line); }
-    .case:hover,.case.active { background:#fff8db; border-color:#879c93; box-shadow:inset 0 0 0 1px #879c93; }
+    .case:hover,.case.active { background:#eef6f3; border-color:#6e958c; box-shadow:inset 0 0 0 1px #6e958c; }
     .case-head,.case-foot { display:flex; justify-content:space-between; gap:8px; }
     .case-head { font-weight:600; } .case-foot { margin-top:8px; color:var(--muted); font-size:12px; }
     .pill { display:inline-block; padding:2px 6px; color:#fff; background:var(--orange); font-size:11px; line-height:1.3; }
     .pill.p2 { background:var(--teal); } .pill.p3 { background:#7b847e; }
     article { padding:30px clamp(22px,4vw,68px) 54px; max-width:1100px; }
     .case-title { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; border-bottom:1px solid var(--ink); padding-bottom:20px; }
-    h2 { margin:5px 0 0; font:700 clamp(23px,3vw,36px)/1.05 "Noto Serif SC", serif; letter-spacing:-.035em; text-wrap:balance; overflow-wrap:anywhere; }
+    h2 { margin:5px 0 0; font:750 clamp(23px,3vw,34px)/1.08 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; letter-spacing:-.025em; text-wrap:balance; overflow-wrap:anywhere; }
     .money { color:var(--red); font-size:24px; font-weight:600; white-space:nowrap; }
     .tagline { color:var(--muted); margin:14px 0 22px; }
     .grid { display:grid; grid-template-columns:1.12fr .88fr; gap:16px; }
@@ -39,7 +42,7 @@
     dl { display:grid; grid-template-columns:auto 1fr; gap:8px 15px; margin:0; }
     dt { color:var(--muted); } dd { margin:0; font-weight:500; overflow-wrap:anywhere; }
     .recommendation { border-color:#7ca49a; background:#e5f0eb; }
-    .recommendation strong { display:block; font:700 25px/1.15 "Noto Serif SC", serif; margin-bottom:8px; }
+    .recommendation strong { display:block; font:750 24px/1.2 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; margin-bottom:8px; }
     .guardrail { margin-top:16px; padding:12px; border:1px dashed var(--orange); background:#fff1d4; font-size:12px; }
     .actions { display:flex; gap:9px; flex-wrap:wrap; margin-top:18px; }
     .action { padding:10px 13px; border:1px solid var(--ink); background:var(--ink); color:#fff; }
@@ -58,14 +61,20 @@
     .model-panel[data-status="fallback"],.model-panel[data-status="disabled"] { border-color:#c88b70; }
     .model-meta { color:var(--muted); font-size:11px; margin-top:7px; overflow-wrap:anywhere; }
     .empty { padding:25px 0; color:var(--muted); }
-    @media (max-width:800px) { main { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .grid,.review-form { grid-template-columns:1fr; } .review-form label:last-child { grid-column:auto; } .topbar { align-items:flex-start; flex-direction:column; } }
+    @media (max-width:800px) { main { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } .grid,.review-form { grid-template-columns:1fr; } .review-form label:last-child { grid-column:auto; } .topbar { align-items:flex-start; flex-direction:column; } .top-actions { justify-items:start; } .top-links { justify-content:flex-start; } }
     @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; transition:none !important; } }
   </style>
 </head>
 <body>
   <header class="topbar">
-    <div><p class="eyebrow">Controlled financial workflow · MVP</p><h1>结算异常复核台</h1></div>
-    <div class="mode" id="mode" role="status" aria-live="polite">加载中：将优先尝试本地 API；无 API 时展示仓库内演示案件。</div>
+    <div><p class="context-line">公开脱敏演示 · 规则裁定 · 人工决定 · 资金执行禁用</p><h1>物流结算异常复核台</h1></div>
+    <div class="top-actions">
+      <div class="mode" id="mode" role="status" aria-live="polite">加载中：将优先尝试本地 API；无 API 时展示仓库内演示案件。</div>
+      <nav class="top-links" aria-label="项目链接">
+        <a href="settlement_dashboard.html">查看分析看板</a>
+        <a href="https://github.com/Martin-cell-blip/logistics-settlement-recon/tree/codex/audit-control-upgrade" target="_blank" rel="noreferrer">查看源码与测试 ↗</a>
+      </nav>
+    </div>
   </header>
   <main>
     <aside>
