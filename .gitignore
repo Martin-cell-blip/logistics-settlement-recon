@@ -4,6 +4,7 @@ data/generated/*.csv
 output/*.csv
 output/*.xlsx
 output/*.md
+output/*.json
 
 # Python
 __pycache__/
@@ -11,6 +12,7 @@ __pycache__/
 .venv/
 venv/
 *.duckdb
+*.sqlite3
 
 # 保留空目录
 !data/raw/.gitkeep
