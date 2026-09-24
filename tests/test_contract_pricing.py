@@ -1,6 +1,11 @@
 import pandas as pd
 
-from src.generate_data import _stable_carrier, build_contract_rate_card
+from src.generate_data import (
+    N_GHOST_ORDERS,
+    _ghost_order_id,
+    _stable_carrier,
+    build_contract_rate_card,
+)
 from src.operational_store import OperationalStore
 
 
@@ -18,6 +23,14 @@ def test_carrier_assignment_is_deterministic():
     assert _stable_carrier("order-1", "seller-1") == _stable_carrier(
         "order-1", "seller-1"
     )
+
+
+def test_ghost_order_ids_are_seeded_and_unique():
+    # uuid4() made these IDs differ on every run, so the ID-based hold-out split drifted.
+    ids = [_ghost_order_id(i) for i in range(N_GHOST_ORDERS)]
+    assert ids == [_ghost_order_id(i) for i in range(N_GHOST_ORDERS)]
+    assert len(set(ids)) == N_GHOST_ORDERS
+    assert all(len(x) == 32 and set(x) <= set("0123456789abcdef") for x in ids)
 
 
 def test_operational_store_applies_schema_migrations(tmp_path):

@@ -1,17 +1,18 @@
 """
-generate_data.py — 从 Olist 真实电商数据派生"结算对账"场景所需的两份合成数据：
-  1) 承运商账单 carrier_bill.csv      —— 在系统应计运费(SOR)基础上【注入已知差异】，用于三方对账
+generate_data.py — 从 Olist 公开电商数据派生"结算对账"场景所需的合成数据：
+  1) 承运商账单 carrier_bill.csv      —— 在逐单合同预期金额基础上【注入已知差异】，用于三方对账
   2) 应收账款台账 ar_invoices.csv     —— 把每个卖家当作 B2B 客户按月开票并模拟回款，用于账龄/DSO/坏账
 
 设计要点：
-- SOR（System of Record，系统应计运费）来自 Olist order_items 的 freight_value，视为"平台系统认为应付承运商的运费"，是对账真值。
-- 承运商账单在 SOR 上注入 5 类差异并保留隐藏列 _injected_type 作为 ground-truth（对账 SQL 不得使用该列），
-  从而可事后计算对账引擎的 precision/recall，证明"异常识别覆盖率"。
-- 全流程固定随机种子 (RNG_SEED)，可复现。金额单位沿用 Olist 原始币种（示意，可视作"元"）。
+- 对账真值是合同预期金额（v0.3 起）：72 条合同费率（8 承运商 × 3 服务区 × 3 重量带，单一版本 contract-2018-v1）
+  按计费重量算出逐单应付。Olist order_items 的 freight_value（SOR，系统应计运费）只作参照列保留，不再当真值。
+- 承运商账单注入 5 类差异（金额错配在对账侧再分为超额/少计，共识别 6 类异常），并保留隐藏列 _injected_type
+  作为 ground-truth（对账 SQL 不得使用该列），事后用来计算对账引擎的 precision/recall。
+- 全流程固定随机种子 (RNG_SEED)；幽灵单 order_id 由种子与序号哈希得出（v0.3.2 起），同一输入重跑逐字节一致。
+- 金额单位是巴西雷亚尔（BRL，沿用 Olist 原始币种）；本项目不对外声称可追回金额。
 """
 from __future__ import annotations
 import hashlib
-import uuid
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -25,7 +26,8 @@ GEN = ROOT / "data" / "generated"
 GEN.mkdir(parents=True, exist_ok=True)
 
 COMMISSION_RATE = 0.12          # 平台向卖家收取的佣金率（用于 AR 发票金额）
-TOLERANCE_PCT = 0.02            # 对账容差：账单与 SOR 相差 ±2% 以内视为匹配（写入 rate_card）
+TOLERANCE_PCT = 0.02            # 对账容差：账单与合同预期金额相差 ±2% 以内视为匹配（写入 rate_card）
+N_GHOST_ORDERS = 1200           # 幽灵单（账单上有、系统里不存在的 order_id）条数
 
 
 STATE_REGION = {
@@ -74,6 +76,15 @@ def build_contract_rate_card() -> pd.DataFrame:
 def _stable_carrier(order_id: str, seller_id: str) -> str:
     digest = hashlib.sha256(f"{order_id}|{seller_id}".encode()).digest()
     return f"CR{digest[0] % 8 + 1:02d}"
+
+
+def _ghost_order_id(i: int) -> str:
+    """幽灵单 order_id：由随机种子与序号哈希得出，32 位十六进制，格式与 Olist order_id 一致。
+
+    此前用 uuid4() 生成，不受 RNG_SEED 控制，导致每次重跑幽灵单 ID 不同、按 ID 划分的留出集行数跟着漂移。
+    这里不消耗全局 rng，其他随机抽样（账单金额、回款行为等）与修复前逐位一致。
+    """
+    return hashlib.sha256(f"ghost-order|{RNG_SEED}|{i}".encode()).hexdigest()[:32]
 
 
 def load_olist() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -159,7 +170,7 @@ def build_carrier_bill(expectations: pd.DataFrame) -> pd.DataFrame:
 
     n = len(delivered)
     # 从 delivered 中划分类别：drop=漏计(不进账单), 其余进账单
-    # 概率：正常匹配 0.86 / 金额错配 0.06 / 重复 0.03 / 漏计(NOT_BILLED) 0.03 / (剩余给未送达+幽灵单在后面补)
+    # 概率：正常匹配 0.88 / 金额错配 0.06 / 重复 0.03 / 漏计(NOT_BILLED) 0.03；未送达与幽灵单在后面单独补
     cat = rng.choice(
         ["MATCH", "AMOUNT_MISMATCH", "DUPLICATE", "DROP"],
         size=n, p=[0.88, 0.06, 0.03, 0.03])
@@ -218,11 +229,14 @@ def build_carrier_bill(expectations: pd.DataFrame) -> pd.DataFrame:
 
     # 幽灵单：伪造 SOR 中不存在的 order_id
     real_sellers = expectations["seller_id"].drop_duplicates().sample(
-        n=min(1200, expectations["seller_id"].nunique()),
+        n=min(N_GHOST_ORDERS, expectations["seller_id"].nunique()),
         random_state=RNG_SEED,
     ).tolist()
-    for _ in range(1200):
-        fake_order = uuid.uuid4().hex
+    real_orders = set(expectations["order_id"])
+    for i in range(N_GHOST_ORDERS):
+        fake_order = _ghost_order_id(i)
+        if fake_order in real_orders:
+            raise ValueError(f"幽灵单 ID 与真实订单冲突：{fake_order}")
         seller = real_sellers[int(rng.integers(0, len(real_sellers)))]
         new_line(
             fake_order, seller, f"CR{int(rng.integers(1, 9)):02d}",

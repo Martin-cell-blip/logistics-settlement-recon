@@ -189,6 +189,8 @@ def validate_recon(con: duckdb.DuckDBPyConnection) -> dict:
     ).fetchdf()
     truth = pd.concat([truth_bill, truth_drop], ignore_index=True)
     evaluation = build_evaluation_frame(truth, recon)
+    # recon 表由并行 join 生成、行序不固定；按主键排序后导出，重跑逐字节一致
+    evaluation = evaluation.sort_values(["order_id", "seller_id"], kind="mergesort").reset_index(drop=True)
     evaluation.to_csv(OUT / "recon_evaluation.csv", index=False)
     summary = {
         "all": classification_metrics(evaluation),

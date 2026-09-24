@@ -209,7 +209,15 @@ def main():
     if exc.empty:
         print("无异常记录。请先运行 run_pipeline.py。")
         return
-    exc = exc.reindex(exc["impact_amount"].abs().sort_values(ascending=False).index).reset_index(drop=True)
+    # case_id 按行号编：金额相同的并列行必须按主键稳定排序，否则重跑后同一 case_id 会指向另一张订单，
+    # 已存的人工决定（以 case_id 为键）就会对错案件。
+    exc = (
+        exc.assign(_abs_impact=exc["impact_amount"].abs())
+        .sort_values(["_abs_impact", "order_id", "seller_id"],
+                     ascending=[False, True, True], kind="mergesort")
+        .drop(columns="_abs_impact")
+        .reset_index(drop=True)
+    )
 
     con = connect()
     records, memos = [], []

@@ -109,7 +109,7 @@ ORDER BY priority, ABS(
         WHEN 'NOT_BILLED' THEN contract_expected_freight
         ELSE 0
     END
-) DESC;
+) DESC, order_id, seller_id;  -- 并列时按主键排，保证重跑行序一致
 
 CREATE OR REPLACE TABLE recon_summary AS
 SELECT
@@ -121,4 +121,4 @@ SELECT
     ROUND(SUM(variance_amount), 2) AS total_variance
 FROM recon
 GROUP BY recon_status
-ORDER BY n_records DESC;
+ORDER BY n_records DESC, recon_status;
