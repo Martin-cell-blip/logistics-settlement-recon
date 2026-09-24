@@ -59,75 +59,76 @@
   <header>
     <h1>电商物流结算 · 对账与应收账龄分析报告</h1>
     <div class="sub">
-      个人项目 · 数据源：Olist 巴西电商公开数据集（99,485 条承运商账单 / 16,068 张应收发票）· 快照 2018-10 ·
+      个人项目 · 数据源：Olist 巴西电商公开数据集 + 合成承运商账单（99,485 条账单 / 16,068 张应收发票）· 金额单位：巴西雷亚尔（R$）· 快照 2018-10 · v0.3.1 实跑 ·
       作品：<a href="https://github.com/Martin-cell-blip/logistics-settlement-recon">github.com/Martin-cell-blip/logistics-settlement-recon</a>
     </div>
   </header>
 
   <!-- KPI -->
   <div class="grid kpis">
-    <div class="kpi"><div class="v">99,485</div><div class="l">对账账单笔数</div></div>
-    <div class="kpi warn"><div class="v">13,368</div><div class="l">识别异常笔数</div></div>
-    <div class="kpi warn"><div class="v">¥139,511</div><div class="l">可拒付 / 追回金额</div></div>
-    <div class="kpi good"><div class="v">99.9%</div><div class="l">异常识别查全率</div></div>
+    <div class="kpi"><div class="v">99,418</div><div class="l">对账评估记录</div></div>
+    <div class="kpi good"><div class="v">86,094</div><div class="l">规则自动放行</div></div>
+    <div class="kpi warn"><div class="v">13,324</div><div class="l">转人工复核</div></div>
+    <div class="kpi good"><div class="v">0</div><div class="l">自动执行</div></div>
+    <div class="kpi good"><div class="v">99.955%</div><div class="l">查准率（召回率 100%）</div></div>
     <div class="kpi"><div class="v">53.7 天</div><div class="l">DSO 应收周转</div></div>
-    <div class="kpi good"><div class="v">2.66%</div><div class="l">加权坏账率(ECL)</div></div>
   </div>
 
   <!-- 三方对账 -->
-  <h2>三方对账结果（系统应计 × 送达确认 × 承运商账单）</h2>
+  <h2>三方对账结果（合同应付 × 送达证据 × 承运商账单）</h2>
   <div class="grid two">
     <div class="card">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">对账判定分布（按笔数）</div>
-      <div class="bar-row"><span class="nm">✓ 匹配 MATCH</span><div class="track"><div class="fill" style="width:86%;background:var(--green)">85.0%</div></div><span class="amt">86,050</span></div>
-      <div class="bar-row"><span class="nm">超额计费 OVER</span><div class="track"><div class="fill" style="width:24%;background:var(--red)">3.5%</div></div><span class="amt">3,493</span></div>
+      <div class="bar-row"><span class="nm">✓ 匹配 MATCH</span><div class="track"><div class="fill" style="width:86%;background:var(--green)">85.1%</div></div><span class="amt">86,094</span></div>
+      <div class="bar-row"><span class="nm">超额计费 OVER</span><div class="track"><div class="fill" style="width:24%;background:var(--red)">3.5%</div></div><span class="amt">3,508</span></div>
       <div class="bar-row"><span class="nm">重复计费 DUP</span><div class="track"><div class="fill" style="width:21%;background:var(--red)">3.0%</div></div><span class="amt">2,989</span></div>
       <div class="bar-row"><span class="nm">漏计 NOT_BILLED</span><div class="track"><div class="fill" style="width:20%;background:var(--amber)">2.9%</div></div><span class="amt">2,922</span></div>
-      <div class="bar-row"><span class="nm">少计 UNDER</span><div class="track"><div class="fill" style="width:16%;background:var(--amber)">2.3%</div></div><span class="amt">2,357</span></div>
+      <div class="bar-row"><span class="nm">少计 UNDER</span><div class="track"><div class="fill" style="width:16%;background:var(--amber)">2.3%</div></div><span class="amt">2,298</span></div>
       <div class="bar-row"><span class="nm">幽灵单 PHANTOM</span><div class="track"><div class="fill" style="width:9%;background:var(--red)">1.2%</div></div><span class="amt">1,200</span></div>
-      <div class="bar-row"><span class="nm">未送达计费</span><div class="track"><div class="fill" style="width:4%;background:var(--red)">0.4%</div></div><span class="amt">407</span></div>
-      <div class="note">另有 1,792 笔"未送达且未计费"良性项（不计入异常）。</div>
+      <div class="bar-row"><span class="nm">未送达计费</span><div class="track"><div class="fill" style="width:3%;background:var(--red)">0.4%</div></div><span class="amt">407</span></div>
+      <div class="note">另有 1,792 笔"未送达且未计费"良性项（NO_ACTIVITY，不计入异常、不进复核队列）。</div>
     </div>
     <div class="card">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">引擎验证 · 查全率（对比注入 ground-truth）</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">引擎验证（规则执行后对照注入标签）</div>
       <table>
-        <tr><th>异常类型</th><th class="n">样本</th><th class="n">查全率</th></tr>
-        <tr><td>重复计费</td><td class="n">2,989</td><td class="n">100%</td></tr>
-        <tr><td>幽灵单</td><td class="n">1,200</td><td class="n">100%</td></tr>
-        <tr><td>未送达计费</td><td class="n">400</td><td class="n">100%</td></tr>
-        <tr><td>漏计</td><td class="n">2,922</td><td class="n">100%</td></tr>
-        <tr><td>金额错配</td><td class="n">5,807</td><td class="n">99.7%</td></tr>
-        <tr><td><b>异常总体</b></td><td class="n"><b>13,318</b></td><td class="n"><b>99.9%</b></td></tr>
+        <tr><th>异常类型</th><th class="n">样本</th><th class="n">查全率</th><th class="n">查准率</th></tr>
+        <tr><td>重复计费</td><td class="n">2,989</td><td class="n">100%</td><td class="n">100%</td></tr>
+        <tr><td>幽灵单</td><td class="n">1,200</td><td class="n">100%</td><td class="n">100%</td></tr>
+        <tr><td>未送达计费</td><td class="n">400</td><td class="n">100%</td><td class="n">98.3%</td></tr>
+        <tr><td>漏计</td><td class="n">2,922</td><td class="n">100%</td><td class="n">100%</td></tr>
+        <tr><td>金额错配（超额／少计）</td><td class="n">5,807</td><td class="n">99.98%</td><td class="n">100%</td></tr>
+        <tr><td><b>异常总体</b></td><td class="n"><b>13,318</b></td><td class="n"><b>100%</b></td><td class="n"><b>99.955%</b></td></tr>
       </table>
-      <div class="callout" style="margin-top:12px">用合成账单时注入的已知差异作真值验证，证明引擎“该抓的都抓到了”：金额错配漏掉的 0.3% 落在 ±2% 容差内，本就应判为匹配的边界项。</div>
+      <div class="callout" style="margin-top:12px">标签只在规则执行完成后用于评分，不进入判定链路。全量 6 条误报都落在"未送达计费"一类；v0.3.1 修复后这 6 条都转人工复核，不会被建议拒付。总体按"是否识别为异常"计算：1 条金额错配被归到未送达，仍进入人工复核。</div>
     </div>
   </div>
 
   <!-- 异常复核 -->
-  <h2>异常受控复核与人工审批建议（金额-单据溯源 Copilot）</h2>
+  <h2>异常受控复核：规则建议 + 人工审批（不执行任何资金动作）</h2>
   <div class="grid two">
     <div class="card">
       <table>
-        <tr><th>裁定</th><th>建议动作</th><th class="n">笔数</th><th class="n">金额影响</th></tr>
-        <tr><td>确认</td><td><span class="tag t-rej">拒付整笔</span></td><td class="n">1,607</td><td class="n">49,103</td></tr>
-        <tr><td>确认</td><td><span class="tag t-rej">拒付重复部分</span></td><td class="n">2,989</td><td class="n">68,873</td></tr>
-        <tr><td>确认</td><td><span class="tag t-clw">追回差额</span></td><td class="n">3,493</td><td class="n">21,536</td></tr>
-        <tr><td>疑似</td><td><span class="tag t-chk">人工复核</span></td><td class="n">2,357</td><td class="n">−14,730</td></tr>
-        <tr><td>疑似</td><td><span class="tag t-chk">催开票/确认应付</span></td><td class="n">2,922</td><td class="n">−65,281</td></tr>
+        <tr><th>裁定</th><th>建议动作</th><th class="n">笔数</th><th class="n">金额影响（R$）</th></tr>
+        <tr><td>确认</td><td><span class="tag t-rej">拒付整笔</span></td><td class="n">1,598</td><td class="n">44,914</td></tr>
+        <tr><td>确认</td><td><span class="tag t-rej">拒付重复部分</span></td><td class="n">2,989</td><td class="n">39,531</td></tr>
+        <tr><td>确认</td><td><span class="tag t-clw">追回差额</span></td><td class="n">3,508</td><td class="n">12,600</td></tr>
+        <tr><td>疑似</td><td><span class="tag t-chk">人工复核（证据冲突）</span></td><td class="n">9</td><td class="n">96</td></tr>
+        <tr><td>疑似</td><td><span class="tag t-chk">人工复核／确认成本</span></td><td class="n">2,298</td><td class="n">−8,381</td></tr>
+        <tr><td>疑似</td><td><span class="tag t-chk">催开票／确认应付</span></td><td class="n">2,922</td><td class="n">−38,153</td></tr>
       </table>
-      <div class="callout" style="margin-top:12px"><b>可供人工拒付 / 追回的潜在金额约 ¥139,511</b>；另有 ¥65,281 漏计应付需催承运商开票并计提。</div>
+      <div class="callout" style="margin-top:12px"><b>13,324 条异常全部须人工审批</b>，系统不提供付款、拒付、追款或开票接口；金额影响只用于排序，不作为可追回金额对外声称。</div>
     </div>
     <div class="card">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">Top 异常（按金额影响）</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">Top 异常（按金额影响绝对值）</div>
       <table>
-        <tr><th>类型</th><th class="n">应计</th><th class="n">账单</th><th>处置</th></tr>
-        <tr><td>漏计</td><td class="n">458.73</td><td class="n">0.00</td><td><span class="tag t-chk">催开票</span></td></tr>
-        <tr><td>未送达</td><td class="n">374.28</td><td class="n">374.28</td><td><span class="tag t-rej">拒付</span></td></tr>
-        <tr><td>漏计</td><td class="n">354.76</td><td class="n">0.00</td><td><span class="tag t-chk">催开票</span></td></tr>
-        <tr><td>重复</td><td class="n">321.46</td><td class="n">642.92</td><td><span class="tag t-rej">拒付重复</span></td></tr>
-        <tr><td>重复</td><td class="n">291.72</td><td class="n">583.44</td><td><span class="tag t-rej">拒付重复</span></td></tr>
+        <tr><th>类型</th><th class="n">合同应付</th><th class="n">账单</th><th>建议</th></tr>
+        <tr><td>漏计</td><td class="n">204.08</td><td class="n">0.00</td><td><span class="tag t-chk">催开票</span></td></tr>
+        <tr><td>漏计</td><td class="n">126.63</td><td class="n">0.00</td><td><span class="tag t-chk">催开票</span></td></tr>
+        <tr><td>重复</td><td class="n">125.04</td><td class="n">250.08</td><td><span class="tag t-rej">拒付重复</span></td></tr>
+        <tr><td>重复</td><td class="n">104.55</td><td class="n">209.10</td><td><span class="tag t-rej">拒付重复</span></td></tr>
+        <tr><td>漏计</td><td class="n">104.04</td><td class="n">0.00</td><td><span class="tag t-chk">催开票</span></td></tr>
       </table>
-      <div class="note">每条异常附完整证据链（order_items 逐笔运费 / 订单状态 / 签收时间戳），见 output/exception_review.md。</div>
+      <div class="note">每条异常附完整证据链（合同条款、费率卡版本、逐笔运费、订单状态、签收时间），见 output/exception_review.md。</div>
     </div>
   </div>
 
@@ -135,12 +136,12 @@
   <h2>应收账款账龄 · DSO · 坏账(ECL)计提</h2>
   <div class="grid two">
     <div class="card">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">账龄五桶分布（未结应收 ¥431,606）</div>
-      <div class="bar-row"><span class="nm">Current 未到期</span><div class="track"><div class="fill" style="width:89%;background:var(--green)">89.4%</div></div><span class="amt">385,877</span></div>
-      <div class="bar-row"><span class="nm">逾期 1-30</span><div class="track"><div class="fill" style="width:12%;background:#7fb069">5.9%</div></div><span class="amt">25,518</span></div>
-      <div class="bar-row"><span class="nm">逾期 31-60</span><div class="track"><div class="fill" style="width:7%;background:var(--amber)">2.8%</div></div><span class="amt">12,257</span></div>
-      <div class="bar-row"><span class="nm">逾期 61-90</span><div class="track"><div class="fill" style="width:4%;background:#e07b39">0.9%</div></div><span class="amt">3,753</span></div>
-      <div class="bar-row"><span class="nm">逾期 90+ 坏账</span><div class="track"><div class="fill" style="width:4%;background:var(--red)">1.0%</div></div><span class="amt">4,200</span></div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">账龄五桶分布（未结应收 R$431,715）</div>
+      <div class="bar-row"><span class="nm">Current 未到期</span><div class="track"><div class="fill" style="width:91%;background:var(--green)">90.8%</div></div><span class="amt">391,788</span></div>
+      <div class="bar-row"><span class="nm">逾期 1-30</span><div class="track"><div class="fill" style="width:12%;background:#7fb069">4.5%</div></div><span class="amt">19,567</span></div>
+      <div class="bar-row"><span class="nm">逾期 31-60</span><div class="track"><div class="fill" style="width:7%;background:var(--amber)">2.3%</div></div><span class="amt">9,791</span></div>
+      <div class="bar-row"><span class="nm">逾期 61-90</span><div class="track"><div class="fill" style="width:4%;background:#e07b39">0.7%</div></div><span class="amt">3,106</span></div>
+      <div class="bar-row"><span class="nm">逾期 90+ 坏账</span><div class="track"><div class="fill" style="width:6%;background:var(--red)">1.7%</div></div><span class="amt">7,464</span></div>
       <div class="note">ECL 计提率按账龄：0.9% / 0.9% / 15.6% / 44.2% / 100%（对标京东物流 2024 年报附注披露）。</div>
     </div>
     <div class="card">
@@ -148,19 +149,19 @@
       <table>
         <tr><th>指标</th><th class="n">本账簿</th><th class="n">京东物流*</th></tr>
         <tr><td>DSO 应收周转天数</td><td class="n">53.7 天</td><td class="n">≈31 天</td></tr>
-        <tr><td>加权坏账率(ECL)</td><td class="n">2.66%</td><td class="n">1.8%</td></tr>
-        <tr><td>90+ 占应收比</td><td class="n">0.97%</td><td class="n">1.1%</td></tr>
-        <tr><td>坏账计提总额</td><td class="n">11,474</td><td class="n">未提供</td></tr>
-        <tr><td>近 365 天已核销</td><td class="n">35,962</td><td class="n">未提供</td></tr>
+        <tr><td>加权坏账率(ECL)</td><td class="n">3.26%</td><td class="n">1.8%</td></tr>
+        <tr><td>90+ 占应收比</td><td class="n">1.73%</td><td class="n">1.1%</td></tr>
+        <tr><td>坏账计提总额</td><td class="n">14,066</td><td class="n">未提供</td></tr>
+        <tr><td>近 365 天已核销</td><td class="n">26,329</td><td class="n">未提供</td></tr>
       </table>
-      <div class="callout" style="margin-top:12px">账簿整体健康（90+ 占比 &lt;1%），<b>但 DSO 显著高于京东（54 vs 31 天）</b>，说明“催收提速 / 账期治理”仍有改善空间，正是结算运营岗的价值切口。</div>
+      <div class="callout" style="margin-top:12px">90+ 占应收 1.73%，<b>DSO 显著高于京东（54 vs 31 天）</b>，说明"催收提速 / 账期治理"仍有改善空间，正是结算运营岗的价值切口。</div>
       <div class="note">*京东物流数据来自其 2024 年报附注（见配套行研报告）。</div>
     </div>
   </div>
 
   <footer>
-    方法论：Olist 真实电商运费作"系统应计运费(SOR)"真值 → 合成含 5 类注入差异的承运商账单 → SQL(DuckDB) 三方对账 →
-    Python 账龄/DSO/ECL → 复核 Agent 出处置建议。全流程一键复现，数据与产物均可由脚本重建。
+    方法论（v0.3）：Olist 公开订单 → 72 条合同费率（8 承运商 × 3 服务区 × 3 重量带）算逐单合同应付 → 合成含 6 类注入差异的承运商账单 →
+    SQL(DuckDB) 三方对账 → 规则复核建议（人工审批，不执行资金动作）→ Python 账龄/DSO/ECL。注入标签只在规则执行后用于评分。全流程一键复现，数据与产物均可由脚本重建。
     本报告为个人项目（合成数据）成果展示，非京东真实经营数据。
   </footer>
 </div>
