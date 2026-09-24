@@ -14,7 +14,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-PROMPT_VERSION = "settlement-evidence-summary-v2"
+PROMPT_VERSION = "settlement-evidence-summary-v3"
 DEFAULT_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 Verdict = Literal["CONFIRMED", "SUSPECT", "PASS"]
@@ -30,6 +30,10 @@ Action = Literal[
 Confidence = Literal["高", "中", "低"]
 EvidenceId = Literal[
     "SOR_AMOUNT",
+    "CONTRACT_EXPECTED_AMOUNT",
+    "CONTRACT_CLAUSE",
+    "RATE_CARD_VERSION",
+    "SERVICE_ZONE",
     "ITEM_COUNT",
     "BILL_AMOUNT",
     "BILL_COUNT",
@@ -55,7 +59,7 @@ class ModelReview(BaseModel):
     verdict: Verdict
     recommended_action: Action
     explanation: str = Field(min_length=12, max_length=500)
-    evidence_ids: list[EvidenceId] = Field(min_length=1, max_length=7)
+    evidence_ids: list[EvidenceId] = Field(min_length=1, max_length=11)
     confidence: Confidence
     fallback_reason: str | None = Field(default=None, max_length=240)
 
@@ -145,8 +149,13 @@ def evidence_ledger(evidence: dict) -> dict[str, object]:
     """Return only the bounded, named evidence fields available to the model."""
 
     order = evidence.get("order") or {}
+    contract = evidence.get("contract") or {}
     return {
         "SOR_AMOUNT": evidence.get("sor_freight"),
+        "CONTRACT_EXPECTED_AMOUNT": evidence.get("contract_expected_freight"),
+        "CONTRACT_CLAUSE": contract.get("contract_clause_id"),
+        "RATE_CARD_VERSION": contract.get("rate_card_version"),
+        "SERVICE_ZONE": contract.get("service_zone"),
         "ITEM_COUNT": evidence.get("n_items"),
         "BILL_AMOUNT": evidence.get("billed_total"),
         "BILL_COUNT": evidence.get("n_bill_lines"),
@@ -154,7 +163,7 @@ def evidence_ledger(evidence: dict) -> dict[str, object]:
         "DELIVERY_TIMESTAMP": (
             order.get("order_delivered_customer_date") if order else None
         ),
-        "RECON_RULE": "金额与状态由 controlled-review-v2 确定性规则裁定",
+        "RECON_RULE": "金额与状态由 controlled-review-v3 确定性规则裁定",
     }
 
 
@@ -163,6 +172,15 @@ def available_evidence_ids(evidence: dict) -> set[str]:
 
     ledger = evidence_ledger(evidence)
     available = {"SOR_AMOUNT", "ITEM_COUNT", "BILL_AMOUNT", "BILL_COUNT", "RECON_RULE"}
+    if evidence.get("contract") is not None:
+        available.update(
+            {
+                "CONTRACT_EXPECTED_AMOUNT",
+                "CONTRACT_CLAUSE",
+                "RATE_CARD_VERSION",
+                "SERVICE_ZONE",
+            }
+        )
     if evidence.get("order") is not None:
         available.update({"ORDER_STATUS", "DELIVERY_TIMESTAMP"})
     return {key for key in available if key in ledger}

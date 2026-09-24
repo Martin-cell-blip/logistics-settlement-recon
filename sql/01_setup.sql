@@ -13,6 +13,12 @@ CREATE OR REPLACE TABLE raw_orders AS
 CREATE OR REPLACE TABLE carrier_bill AS
     SELECT * FROM read_csv_auto('data/generated/carrier_bill.csv');
 
+CREATE OR REPLACE TABLE contract_expectations AS
+    SELECT * FROM read_csv_auto('data/generated/contract_expectations.csv');
+
+CREATE OR REPLACE TABLE contract_rate_card AS
+    SELECT * FROM read_csv_auto('data/generated/contract_rate_card.csv');
+
 CREATE OR REPLACE TABLE ar_invoices AS
     SELECT * FROM read_csv_auto('data/generated/ar_invoices.csv');
 

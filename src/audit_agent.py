@@ -38,6 +38,8 @@ def connect() -> duckdb.DuckDBPyConnection:
         CREATE TABLE raw_order_items AS SELECT * FROM read_csv_auto('{_p(RAW/"olist_order_items_dataset.csv")}');
         CREATE TABLE raw_orders      AS SELECT * FROM read_csv_auto('{_p(RAW/"olist_orders_dataset.csv")}');
         CREATE TABLE carrier_bill    AS SELECT * FROM read_csv_auto('{_p(GEN/"carrier_bill.csv")}');
+        CREATE TABLE contract_expectations AS
+            SELECT * FROM read_csv_auto('{_p(GEN/"contract_expectations.csv")}');
     """)
     return con
 
@@ -56,8 +58,19 @@ def trace(con: duckdb.DuckDBPyConnection, order_id: str, seller_id: str) -> dict
         """SELECT bill_line_id, billed_freight, carrier_id, bill_date
            FROM carrier_bill WHERE order_id=? AND seller_id=? ORDER BY bill_line_id""",
         [order_id, seller_id]).fetchdf()
+    contract = con.execute(
+        """SELECT carrier_id, service_zone, chargeable_weight_kg, rate_card_version,
+                  contract_clause_id, contract_expected_freight, sor_freight
+           FROM contract_expectations WHERE order_id=? AND seller_id=?""",
+        [order_id, seller_id],
+    ).fetchdf()
+    contract_row = contract.iloc[0].to_dict() if len(contract) else None
     return {
         "sor_freight": round(float(items["freight_value"].sum()), 2) if len(items) else 0.0,
+        "contract_expected_freight": (
+            float(contract_row["contract_expected_freight"]) if contract_row else 0.0
+        ),
+        "contract": contract_row,
         "n_items": len(items),
         "items": items,
         "order": order.iloc[0].to_dict() if len(order) else None,
@@ -68,6 +81,23 @@ def trace(con: duckdb.DuckDBPyConnection, order_id: str, seller_id: str) -> dict
     }
 
 
+def _has_timestamp(value) -> bool:
+    """True only for a real timestamp; None, NaN, NaT and blank strings count as missing.
+
+    DuckDB ``fetchdf()`` returns missing delivery dates as ``pd.NaT``, and
+    ``bool(pd.NaT)`` is True, so a plain truthiness check reads "never
+    delivered" as "delivered".
+    """
+    if value is None:
+        return False
+    try:
+        if pd.isna(value):
+            return False
+    except (TypeError, ValueError):
+        pass
+    return str(value).strip() != ""
+
+
 # 各异常类型的规则化复核逻辑：返回 (裁定, 建议动作, 置信度, 依据)
 def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
     """Return a *recommendation*, never an executable financial instruction.
@@ -76,7 +106,8 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
     amounts.  When required evidence is missing or conflicts with the expected
     pattern, the safe fallback is human review rather than an AI recommendation.
     """
-    sor, billed_u, n_bill = ev["sor_freight"], ev["billed_unit"], ev["n_bill_lines"]
+    expected = ev.get("contract_expected_freight", ev["sor_freight"])
+    billed_u, n_bill = ev["billed_unit"], ev["n_bill_lines"]
     order = ev["order"]
     status = order["order_status"] if order else "无订单记录"
     if recon_status != "MISSING_ORDER" and (order is None or ev["n_items"] == 0):
@@ -85,7 +116,7 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
     if recon_status == "DUPLICATE" and n_bill < 2:
         return ("SUSPECT", "人工复核", "低",
                 "重复计费判定与账单行数不一致，需人工检查账单聚合和主数据。")
-    if recon_status in {"OVERBILLED", "UNDERBILLED"} and (sor <= 0 or billed_u <= 0):
+    if recon_status in {"OVERBILLED", "UNDERBILLED"} and (expected <= 0 or billed_u <= 0):
         return ("SUSPECT", "人工复核", "低",
                 "金额证据不完整或为零，需人工确认合同费率、币种和税费口径。")
     delivered_at = order.get("order_delivered_customer_date") if order else None
@@ -93,21 +124,21 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
         return ("SUSPECT", "人工复核", "低",
                 "幽灵计费判定与订单或费用明细冲突，需人工检查关联键和主数据。")
     if recon_status == "NOT_DELIVERED" and (
-        status == "delivered" or bool(delivered_at)
+        status == "delivered" or _has_timestamp(delivered_at)
     ):
         return ("SUSPECT", "人工复核", "低",
                 "未送达判定与订单状态或签收时间冲突，需人工检查状态同步。")
     if recon_status == "DUPLICATE" and ev["billed_total"] <= billed_u:
         return ("SUSPECT", "人工复核", "低",
                 "重复计费判定与账单合计不一致，需人工检查账单聚合。")
-    if recon_status == "OVERBILLED" and billed_u <= sor:
+    if recon_status == "OVERBILLED" and billed_u <= expected:
         return ("SUSPECT", "人工复核", "低",
                 "超额计费判定与金额方向冲突，需人工检查容差、币种和税费口径。")
-    if recon_status == "UNDERBILLED" and billed_u >= sor:
+    if recon_status == "UNDERBILLED" and billed_u >= expected:
         return ("SUSPECT", "人工复核", "低",
                 "少计判定与金额方向冲突，需人工检查容差、币种和税费口径。")
     if recon_status == "NOT_BILLED" and (
-        status != "delivered" or not delivered_at
+        status != "delivered" or not _has_timestamp(delivered_at)
     ):
         return ("SUSPECT", "人工复核", "低",
                 "漏计应付判定缺少已送达证据，需人工确认服务是否实际发生。")
@@ -123,13 +154,13 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
                 f"同(order,seller)出现 {n_bill} 条账单、单笔应为 {billed_u:.2f}，重复计费 {dup:.2f} 应拒付。")
     if recon_status == "OVERBILLED":
         return ("CONFIRMED", "追回差额", "中",
-                f"账单 {billed_u:.2f} > 系统应计 {sor:.2f} 且超 ±2% 容差，超额 {billed_u - sor:.2f} 应追回。")
+                f"账单 {billed_u:.2f} > 合同预期 {expected:.2f} 且超 ±2% 容差，超额 {billed_u - expected:.2f} 应追回。")
     if recon_status == "UNDERBILLED":
         return ("SUSPECT", "人工复核/确认成本", "中",
-                f"账单 {billed_u:.2f} < 系统应计 {sor:.2f}，少计 {sor - billed_u:.2f}；需确认是折扣还是漏计。")
+                f"账单 {billed_u:.2f} < 合同预期 {expected:.2f}，少计 {expected - billed_u:.2f}；需确认是折扣还是漏计。")
     if recon_status == "NOT_BILLED":
         return ("SUSPECT", "催承运商开票/确认应付", "中",
-                f"系统已送达(应计 {sor:.2f})但未收到承运商账单，存在未入账应付成本，应催开票并计提。")
+                f"系统已送达(合同预期 {expected:.2f})但未收到承运商账单，存在未入账应付成本，应催开票并计提。")
     return ("PASS", "无需处理", "高", "账单与系统一致，在容差内。")
 
 
@@ -145,7 +176,8 @@ def memo(
     order = ev["order"] or {}
     lines = [
         f"### [{row.priority}] {row.recon_status} — order `{row.order_id[:12]}…` / seller `{row.seller_id[:8]}…`",
-        f"- **金额影响**：{row.impact_amount:,.2f}　|　系统应计 SOR={ev['sor_freight']:.2f}　账单合计={ev['billed_total']:.2f}（{ev['n_bill_lines']} 条）",
+        f"- **金额影响**：{row.impact_amount:,.2f}　|　合同预期={ev.get('contract_expected_freight', 0):.2f}　来源运费={ev['sor_freight']:.2f}　账单合计={ev['billed_total']:.2f}（{ev['n_bill_lines']} 条）",
+        f"- **合同证据**：条款=`{(ev.get('contract') or {}).get('contract_clause_id')}`；费率卡=`{(ev.get('contract') or {}).get('rate_card_version')}`；服务区=`{(ev.get('contract') or {}).get('service_zone')}`",
         f"- **单据溯源**：order_items {ev['n_items']} 条明细；订单状态=`{order.get('order_status')}`；"
         f"承运时间=`{order.get('order_delivered_carrier_date')}`；客户签收=`{order.get('order_delivered_customer_date')}`",
         f"- **复核裁定**：**{verdict}** → 建议：**{action}**（置信度 {conf}）",
@@ -177,7 +209,15 @@ def main():
     if exc.empty:
         print("无异常记录。请先运行 run_pipeline.py。")
         return
-    exc = exc.reindex(exc["impact_amount"].abs().sort_values(ascending=False).index).reset_index(drop=True)
+    # case_id 按行号编：金额相同的并列行必须按主键稳定排序，否则重跑后同一 case_id 会指向另一张订单，
+    # 已存的人工决定（以 case_id 为键）就会对错案件。
+    exc = (
+        exc.assign(_abs_impact=exc["impact_amount"].abs())
+        .sort_values(["_abs_impact", "order_id", "seller_id"],
+                     ascending=[False, True, True], kind="mergesort")
+        .drop(columns="_abs_impact")
+        .reset_index(drop=True)
+    )
 
     con = connect()
     records, memos = [], []
@@ -196,13 +236,18 @@ def main():
             "case_id": f"REC-{i + 1:06d}",
             "priority": row.priority, "recon_status": row.recon_status,
             "order_id": row.order_id, "seller_id": row.seller_id,
-            "sor_freight": ev["sor_freight"], "billed_total": ev["billed_total"],
+            "sor_freight": ev["sor_freight"],
+            "contract_expected_freight": ev["contract_expected_freight"],
+            "contract_clause_id": (ev.get("contract") or {}).get("contract_clause_id"),
+            "rate_card_version": (ev.get("contract") or {}).get("rate_card_version"),
+            "service_zone": (ev.get("contract") or {}).get("service_zone"),
+            "billed_total": ev["billed_total"],
             "impact_amount": row.impact_amount,
             "verdict": verdict, "recommended_action": action, "confidence": conf,
             "rationale": rationale,
             "requires_human_approval": True,
             "auto_execution_allowed": False,
-            "policy_version": "controlled-review-v2",
+            "policy_version": "controlled-review-v3",
             "model_output_role": "evidence_summary_only",
         })
         if i < args.top:
@@ -223,9 +268,9 @@ def main():
         ),
         "",
         "## 复核汇总",
-        rev.groupby(["verdict", "recommended_action"]).agg(
+        "```text\n" + rev.groupby(["verdict", "recommended_action"]).agg(
             笔数=("order_id", "count"), 金额影响合计=("impact_amount", "sum")
-        ).round(2).to_markdown(),
+        ).round(2).to_string() + "\n```",
         "",
         "## Top 异常审计备忘",
         "",

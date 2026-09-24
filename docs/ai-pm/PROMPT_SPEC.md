@@ -1,6 +1,6 @@
 # 结构化模型摘要 Prompt 规格
 
-> Prompt 版本：`settlement-evidence-summary-v2`  
+> Prompt 版本：`settlement-evidence-summary-v3`（v0.3 起；v2 为 v0.2 版，差别见文末「版本记录」）  
 > 实现：`src/model_review.py`  
 > 回滚：将服务环境的版本切回上一稳定提交；规则裁定和人工审批不受模型版本影响。
 
@@ -16,11 +16,16 @@
 
 ## 2. 输入契约
 
-输入包含三块：
+输入包含四块：
 
 1. `recon_status`：上游对账异常类型；
-2. `evidence_ledger`：限定为 `SOR_AMOUNT`、`ITEM_COUNT`、`BILL_AMOUNT`、`BILL_COUNT`、`ORDER_STATUS`、`DELIVERY_TIMESTAMP`、`RECON_RULE`；
-3. `rule_decision`：确定性规则的 `verdict`、`recommended_action`、`confidence` 和人读理由。
+2. `evidence_ledger`：限定为以下 11 个证据 ID——
+   - 合同证据（案件带合同条款时才可引用）：`CONTRACT_EXPECTED_AMOUNT`、`CONTRACT_CLAUSE`、`RATE_CARD_VERSION`、`SERVICE_ZONE`；
+   - 账单与明细：`SOR_AMOUNT`（系统应计运费，仅作参照）、`ITEM_COUNT`、`BILL_AMOUNT`、`BILL_COUNT`；
+   - 订单证据（能关联到订单时才可引用）：`ORDER_STATUS`、`DELIVERY_TIMESTAMP`；
+   - 规则说明：`RECON_RULE`（金额与状态由 `controlled-review-v3` 确定性规则裁定）；
+3. `rule_decision`：确定性规则的 `verdict`、`recommended_action`、`confidence` 和人读理由；
+4. `output_contract`：`prompt_version`、`recommendation_only: true`、`financial_execution: "disabled"`，把"只给建议、不执行资金动作"写进每次输入。
 
 不向模型发送客户联系方式、支付账户、API Key 或与案件无关的个人信息。
 
@@ -31,13 +36,13 @@
   "verdict": "CONFIRMED | SUSPECT | PASS",
   "recommended_action": "受限动作枚举",
   "explanation": "12–500 字符的证据摘要",
-  "evidence_ids": ["SOR_AMOUNT", "BILL_AMOUNT", "RECON_RULE"],
+  "evidence_ids": ["CONTRACT_EXPECTED_AMOUNT", "BILL_AMOUNT", "RECON_RULE"],
   "confidence": "高 | 中 | 低",
   "fallback_reason": null
 }
 ```
 
-Pydantic 配置为 `extra="forbid"`；未知字段、未知证据 ID、空证据列表或超长文本会直接解析失败。
+Pydantic 配置为 `extra="forbid"`；未知字段、未知证据 ID、空证据列表、超过 11 个证据引用或超长文本会直接解析失败。
 
 ## 4. 运行时护栏
 
@@ -62,3 +67,10 @@ Pydantic 配置为 `extra="forbid"`；未知字段、未知证据 ID、空证据
 3. 在冻结集复测；
 4. 达到门槛后更新模型 ID 和 Prompt 版本；
 5. 异常时回滚提交或关闭模型摘要，规则流程继续工作。
+
+## 6. 版本记录
+
+| 版本 | 随项目版本 | 变化 |
+|---|---|---|
+| `settlement-evidence-summary-v3` | v0.3（2026-07-20，提交 2c30e81） | 证据账本新增合同证据 `CONTRACT_EXPECTED_AMOUNT`、`CONTRACT_CLAUSE`、`RATE_CARD_VERSION`、`SERVICE_ZONE`（仅案件带合同条款时可引用），证据引用上限由 7 个放宽到 11 个；`RECON_RULE` 指向 `controlled-review-v3`。输出 Schema 与第 4 节五条运行时护栏不变。 |
+| `settlement-evidence-summary-v2` | v0.2（2026-07-17） | 首个受控版本：结构化输出、证据 ID 白名单、与规则裁定／动作／置信度的一致性校验，不通过即回退规则理由。 |

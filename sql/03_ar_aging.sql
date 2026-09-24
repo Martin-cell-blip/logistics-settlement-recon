@@ -88,7 +88,7 @@ SELECT invoice_id, client_id, client_state, invoice_date, due_date,
        invoice_amount, days_past_due
 FROM ar_aging
 WHERE aging_bucket = '90+'
-ORDER BY invoice_amount DESC;
+ORDER BY invoice_amount DESC, invoice_id;  -- 并列时按主键排，保证重跑行序一致
 
 -- 按客户的应收与账龄暴露（Top 客户，供授信/账期治理）
 CREATE OR REPLACE TABLE ar_by_client AS
@@ -101,4 +101,4 @@ SELECT
           / NULLIF(SUM(invoice_amount), 0), 1)                             AS pct_90plus
 FROM ar_aging
 GROUP BY client_id, client_state
-ORDER BY open_ar DESC;
+ORDER BY open_ar DESC, client_id;  -- 并列时按主键排，保证重跑行序一致
