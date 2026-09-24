@@ -81,6 +81,23 @@ def trace(con: duckdb.DuckDBPyConnection, order_id: str, seller_id: str) -> dict
     }
 
 
+def _has_timestamp(value) -> bool:
+    """True only for a real timestamp; None, NaN, NaT and blank strings count as missing.
+
+    DuckDB ``fetchdf()`` returns missing delivery dates as ``pd.NaT``, and
+    ``bool(pd.NaT)`` is True, so a plain truthiness check reads "never
+    delivered" as "delivered".
+    """
+    if value is None:
+        return False
+    try:
+        if pd.isna(value):
+            return False
+    except (TypeError, ValueError):
+        pass
+    return str(value).strip() != ""
+
+
 # 各异常类型的规则化复核逻辑：返回 (裁定, 建议动作, 置信度, 依据)
 def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
     """Return a *recommendation*, never an executable financial instruction.
@@ -107,7 +124,7 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
         return ("SUSPECT", "人工复核", "低",
                 "幽灵计费判定与订单或费用明细冲突，需人工检查关联键和主数据。")
     if recon_status == "NOT_DELIVERED" and (
-        status == "delivered" or bool(delivered_at)
+        status == "delivered" or _has_timestamp(delivered_at)
     ):
         return ("SUSPECT", "人工复核", "低",
                 "未送达判定与订单状态或签收时间冲突，需人工检查状态同步。")
@@ -121,7 +138,7 @@ def review(recon_status: str, ev: dict) -> tuple[str, str, str, str]:
         return ("SUSPECT", "人工复核", "低",
                 "少计判定与金额方向冲突，需人工检查容差、币种和税费口径。")
     if recon_status == "NOT_BILLED" and (
-        status != "delivered" or not delivered_at
+        status != "delivered" or not _has_timestamp(delivered_at)
     ):
         return ("SUSPECT", "人工复核", "低",
                 "漏计应付判定缺少已送达证据，需人工确认服务是否实际发生。")
